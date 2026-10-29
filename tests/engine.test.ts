@@ -32,6 +32,14 @@ describe('species data', () => {
     }
   });
 
+  it('keeps names within the Gen III limit of 10 letters', () => {
+    for (const s of SPECIES_LIST) expect(s.name.length, s.name).toBeLessThanOrEqual(10);
+  });
+
+  it('gives every species a move at level 1', () => {
+    for (const s of SPECIES_LIST) expect(createPokemon(s.id, 1).moves.length, s.id).toBeGreaterThan(0);
+  });
+
   it('gives each starter a STAB move at level 5', () => {
     for (const id of STARTERS) {
       const p = createPokemon(id, 5);

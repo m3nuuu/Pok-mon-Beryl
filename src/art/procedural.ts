@@ -1,7 +1,9 @@
 // Placeholder pixel art drawn in code, so the prototype ships with no third-party assets.
 // Every texture here is meant to be replaced by real tiles/sprites later.
 import Phaser from 'phaser';
+import type { SpeciesData } from '../data/species';
 import { BUILDINGS, type Building } from '../data/stillbrook';
+import type { Type } from '../data/types';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -291,4 +293,29 @@ export function generateArt(scene: Phaser.Scene): void {
     tallGrass(c);
     c.clearRect(0, 0, 16, 8);
   });
+}
+
+const TYPE_COLORS: Record<Type, string> = {
+  Normal: '#a8a878', Fire: '#f08030', Water: '#6890f0', Electric: '#f8d030', Grass: '#78c850',
+  Ice: '#98d8d8', Fighting: '#c03028', Poison: '#a040a0', Ground: '#e0c068', Flying: '#a890f0',
+  Psychic: '#f85888', Bug: '#a8b820', Rock: '#b8a038', Ghost: '#705898', Dragon: '#7038f8',
+  Dark: '#705848', Steel: '#b8b8d0', Fairy: '#ee99ac',
+};
+
+/** 64x64 stand-in for species that have no drawn sprite yet: a type-colored blob with its dex number. */
+export function monPlaceholders(scene: Phaser.Scene, species: SpeciesData[]): void {
+  for (const s of species) {
+    canvasTexture(scene, `mon-${s.id}`, 64, 64, (c) => {
+      const [main, second = main] = s.types;
+      c.fillStyle = TYPE_COLORS[main];
+      c.beginPath();
+      c.ellipse(32, 36, 24, 22, 0, 0, Math.PI * 2);
+      c.fill();
+      r(c, 20, 52, 24, 4, TYPE_COLORS[second]);
+      c.fillStyle = '#202028';
+      c.font = 'bold 14px monospace';
+      c.textAlign = 'center';
+      c.fillText(s.dex, 32, 41);
+    });
+  }
 }
