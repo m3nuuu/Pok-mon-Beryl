@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Pokémon Beryl</title>
+    <style>
+      html, body {
+        margin: 0;
+        height: 100%;
+        background: #101418;
+        color: #c8d8e0;
+        font-family: system-ui, sans-serif;
+        overflow: hidden;
+        touch-action: none;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #wrap { display: flex; flex-direction: column; height: 100%; }
+      #game { flex: 1; min-height: 0; }
+      #help {
+        text-align: center;
+        font-size: 13px;
+        padding: 6px;
+        opacity: 0.7;
+      }
+      #pad { display: none; }
+      @media (pointer: coarse) {
+        #help { display: none; }
+        #pad {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 8px 12px 20px;
+          gap: 8px;
+        }
+      }
+      .dpad { display: grid; grid-template-columns: repeat(3, 48px); grid-template-rows: repeat(3, 48px); }
+      .btn {
+        background: #2a3440;
+        border: 2px solid #4a5a6a;
+        border-radius: 10px;
+        color: #e0e8f0;
+        font: bold 18px system-ui, sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .btn.active { background: #4a6a80; }
+      .ab { display: flex; gap: 10px; align-items: center; }
+      .ab .btn { width: 56px; height: 56px; border-radius: 50%; }
+      .ab .start { width: 52px; height: 28px; border-radius: 14px; font-size: 11px; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap">
+      <div id="game"></div>
+      <div id="help">Arrows/WASD: move · Z/Enter/Space: A · X/Esc: B · Shift: menu</div>
+      <div id="pad">
+        <div class="dpad">
+          <span></span><div class="btn" data-btn="up">▲</div><span></span>
+          <div class="btn" data-btn="left">◀</div><span></span><div class="btn" data-btn="right">▶</div>
+          <span></span><div class="btn" data-btn="down">▼</div><span></span>
+        </div>
+        <div class="ab">
+          <div class="btn start" data-btn="start">MENU</div>
+          <div class="btn" data-btn="b">B</div>
+          <div class="btn" data-btn="a">A</div>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,23 @@
+{
+  "name": "pokemon-beryl",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Pokémon Beryl: a free, non-commercial Gen-3-style fan game set in the Kaldria region.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/press-start-2p": "^5.3.0",
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vite": "^6.4.5",
+    "vitest": "^3.2.4"
+  }
+}
