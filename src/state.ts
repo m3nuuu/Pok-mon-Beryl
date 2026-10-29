@@ -1,4 +1,5 @@
 import type { Pokemon } from './battle/engine';
+import type { MapId } from './data/maps';
 
 export type Facing = 'down' | 'up' | 'left' | 'right';
 
@@ -6,12 +7,16 @@ export interface GameState {
   party: Pokemon[];
   badges: number;
   flags: Record<string, boolean>;
-  player: { x: number; y: number; facing: Facing };
+  player: { map: MapId; x: number; y: number; facing: Facing };
 }
 
-const SAVE_KEY = 'pokemon-beryl-save-v1';
+const SAVE_KEY = 'pokemon-beryl-save-v2';
 
-export const START_POSITION = { x: 4, y: 8, facing: 'down' as Facing };
+/** New game: Beryl wakes up next to his bed. */
+export const START_POSITION = { map: 'home' as MapId, x: 2, y: 3, facing: 'down' as Facing };
+
+/** Where Beryl ends up after whiting out: in front of his house. */
+export const HOME_DOOR = { map: 'stillbrook' as MapId, x: 4, y: 8, facing: 'down' as Facing };
 
 export function newGame(): GameState {
   return { party: [], badges: 0, flags: {}, player: { ...START_POSITION } };

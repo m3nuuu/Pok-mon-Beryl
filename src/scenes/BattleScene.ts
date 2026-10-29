@@ -16,6 +16,8 @@ export interface BattleConfig {
   enemy: Pokemon;
   /** Losing doesn't white out (first rival battle). */
   canLose?: boolean;
+  /** Backdrop: open field, river, or indoors. */
+  bg?: 'plain' | 'water' | 'indoor';
   onEnd: (result: BattleResult) => void;
 }
 
@@ -140,12 +142,20 @@ export class BattleScene extends Phaser.Scene {
 
   private drawBackground() {
     const g = this.add.graphics();
-    g.fillGradientStyle(0xf8f8e8, 0xf8f8e8, 0xd8ecc0, 0xd8ecc0, 1).fillRect(0, 0, SCREEN_W, SCREEN_H);
-    g.fillStyle(0xc0e0a0, 1).fillRect(0, 150, SCREEN_W, 210);
-    g.fillStyle(0x88b868, 1).fillEllipse(520, 214, 290, 56);
-    g.fillStyle(0xa8d088, 1).fillEllipse(520, 210, 270, 44);
-    g.fillStyle(0x88b868, 1).fillEllipse(190, 362, 330, 70);
-    g.fillStyle(0xa8d088, 1).fillEllipse(190, 356, 310, 56);
+    const bg = this.cfg.bg ?? 'plain';
+    if (bg === 'indoor') {
+      g.fillGradientStyle(0xf0e4d0, 0xf0e4d0, 0xd8c4a8, 0xd8c4a8, 1).fillRect(0, 0, SCREEN_W, SCREEN_H);
+      g.fillStyle(0xc8b090, 1).fillRect(0, 150, SCREEN_W, 210);
+    } else {
+      g.fillStyle(bg === 'water' ? 0x1c3c78 : 0x4c8c3c, 1).fillRect(0, 0, SCREEN_W, SCREEN_H);
+      this.add.image(0, 0, `battle-${bg}`).setOrigin(0).setScale(3);
+    }
+    const [rim, top] = bg === 'water' ? [0x5878a8, 0x88a8d0] : bg === 'indoor' ? [0xa08868, 0xc0a888] : [0x6c9848, 0xa8d088];
+    const p = this.add.graphics();
+    p.fillStyle(rim, 1).fillEllipse(520, 214, 290, 56);
+    p.fillStyle(top, 1).fillEllipse(520, 210, 270, 44);
+    p.fillStyle(rim, 1).fillEllipse(190, 362, 330, 70);
+    p.fillStyle(top, 1).fillEllipse(190, 356, 310, 56);
   }
 
   private enemyLabel() {

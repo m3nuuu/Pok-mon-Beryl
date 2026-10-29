@@ -2,13 +2,14 @@
 
 A free, non-commercial, Gen-3-style Pokémon fan game set in the region of **Kaldria**, along the river **Lethys**.
 
-This is the **first playable prototype (v0.1)**: a small vertical slice in Beryl's home town, Stillbrook.
+This is **v0.2: the prologue**, playable from start to finish in Beryl's home town, Stillbrook.
 
-- Walk around Stillbrook below the Mirrormere Dam
-- Meet Prof. Spruce and pick one of the three starters (Mossfawn, Newtide, Cindaroo)
-- Battle your rival Jasper, who takes the starter with the type advantage
-- Fight wild Pipwing in the tall grass east of the bridge, and the fisherman's Murkfin
-- Heal at home (Grandma), save with the menu
+- Wake up at home; Mum and Dad leave for their shift at the Mirrormere Dam
+- Visit Jasper's dad (Fighting gym trainer) and Jasper's mum at the Pokémon Pension, with the family Pokémon tagging along
+- Prof. Spruce is having tea with Grandma: pick Mossfawn, Newtide or Cindaroo
+- First battle against Jasper, then Spruce's task: fill the Pokédex and follow the Lethys from source to sea
+- That evening, Lethys rises from the river by the ferry dock
+- Afterwards: wild Pipwing in the tall grass, the fisherman's Murkfin, healing with Grandma, saving
 
 ## Controls
 
@@ -43,16 +44,22 @@ npm run build    # production build into dist/
 src/
   art/procedural.ts     placeholder tiles, buildings and characters drawn in code
   battle/engine.ts      battle math (pure, tested)
-  data/                 species, moves, type chart, Stillbrook map
+  data/                 species, moves, type chart, maps (town and interiors)
+  story/                story scripts (prologue), driven by flags in the save
   scenes/               Boot, Title, World, UI (dialogs), Battle
   ui/widgets.ts         dialog box, menus, async helpers
 public/sprites/         Pokémon sprites (by Manuel)
+public/battle/          battle backgrounds (by Leob0505, see CREDITS.md)
 tests/                  vitest tests
 ```
 
 ### Editing the map
 
-`src/data/stillbrook.ts` holds the town as ASCII rows (`T` tree, `,` tall grass, `~` river, `:` path, …). Change a character and reload.
+`src/data/maps.ts` holds every map as ASCII rows (`T` tree, `,` tall grass, `~` river, `:` path, …), plus its doors (warps), NPCs and sign texts. NPCs can be tied to story flags with `when`. Change a character and reload; `npm test` checks that doors and NPCs stay reachable.
+
+### Story
+
+`src/story/story.ts` holds the events. Each scene runs when you enter a map or talk to someone, and sets a flag when it is done (`woke`, `parentsLeft`, `metJasperDad`, `metJasperMom`, `gotStarter`, `taskGiven`, `prologueDone`).
 
 ### Adding a Pokémon
 
@@ -63,7 +70,8 @@ tests/                  vitest tests
 
 - Overworld tiles and characters are simple placeholder pixel art drawn in code, to be replaced by real tilesets (see `CREDITS.md`).
 - Your own Pokémon are shown flipped on the player side, since there are no back sprites yet.
-- No catching, bag, party switching, interiors, abilities, status conditions or music yet.
+- The family Pokémon is an original placeholder until its design is ready.
+- No catching, bag, party switching, abilities, status conditions or music yet.
 
 ## Deployment
 

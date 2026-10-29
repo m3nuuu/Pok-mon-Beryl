@@ -1,37 +1,47 @@
 import Phaser from 'phaser';
-import { DIR_FRAMES } from '../art/procedural';
-import { calcStats, createPokemon, heal, movesKnownAt, rivalStarterFor, wildLevel, type Pokemon } from '../battle/engine';
+import { DIR_FRAMES, tableTexture } from '../art/procedural';
+import { calcStats, createPokemon, heal, wildLevel } from '../battle/engine';
+import { MAPS, isSolidTile, tileAt, type MapDef, type MapId, type NpcDef } from '../data/maps';
 import { MOVES } from '../data/moves';
 import { SPECIES } from '../data/species';
-import {
-  BUILDINGS, ENCOUNTERS, ENCOUNTER_RATE, MAP_H, MAP_W, NPCS, SIGNS, isSolidTile, tileAt, type NpcId,
-} from '../data/stillbrook';
 import { heldDirection, isHeld, justPressed } from '../input';
-import { game, save, START_POSITION, type Facing } from '../state';
+import { game, save, HOME_DOOR, type Facing } from '../state';
+import type { ScriptApi } from '../story/api';
+import { onEnterMap, onStepGrassWithoutPokemon, onTalk } from '../story/story';
+import { delay, tweenP } from '../ui/widgets';
 import type { BattleConfig, BattleResult } from './BattleScene';
 import type { UIScene } from './UIScene';
-import { delay, tweenP } from '../ui/widgets';
 
 const T = 16;
 const WALK_MS = 200;
 const RUN_MS = 110;
+const ENCOUNTER_RATE = 1 / 10;
 const DELTA: Record<Facing, [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const OPPOSITE: Record<Facing, Facing> = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
-const TILE_TEXTURES: Record<string, string> = {
+const OUTDOOR_TEXTURES: Record<string, string> = {
   '.': 't-grass', ',': 't-tall', ':': 't-path', F: 't-flowers', T: 't-tree', '~': 't-water0',
-  V: 't-spill0', W: 't-dam', E: 't-damdoor', '=': 't-bridge', f: 't-fence', S: 't-sign', B: 't-grass',
+  V: 't-spill0', W: 't-dam', E: 't-damdoor', '=': 't-bridge', f: 't-fence', S: 't-sign',
+  B: 't-grass', D: 't-path', d: 't-dock',
 };
 
-const nameOf = (p: Pokemon) => SPECIES[p.species].name.toUpperCase();
+const INDOOR_TEXTURES: Record<string, string> = {
+  '#': 'i-void', W: 'i-wall', w: 'i-window', s: 'i-shelf', _: 'i-floor', k: 'i-counter',
+  p: 'i-plant', v: 'i-tv', B: 'i-books', o: 'i-pen', X: 'i-mat',
+};
 
 class Walker {
   sprite: Phaser.GameObjects.Sprite;
   moving = false;
   private stepParity = 0;
+  private readonly isMon: boolean;
 
   constructor(scene: Phaser.Scene, look: string, public x: number, public y: number, public facing: Facing) {
-    this.sprite = scene.add.sprite(0, 0, `c-${look}`, 0).setOrigin(0.5, 1);
+    this.isMon = look.startsWith('mon-');
+    this.sprite = this.isMon
+      ? scene.add.sprite(0, 0, look).setScale(0.42).setOrigin(0.5, 0.95)
+      : scene.add.sprite(0, 0, `c-${look}`, 0).setOrigin(0.5, 1);
+    if (this.isMon) scene.tweens.add({ targets: this.sprite, scaleY: 0.4, duration: 600, yoyo: true, repeat: -1 });
     this.place();
     this.face(facing);
   }
@@ -42,6 +52,7 @@ class Walker {
   }
 
   private frame(offset: number) {
+    if (this.isMon) return;
     const base = DIR_FRAMES[this.facing === 'right' ? 'left' : this.facing];
     this.sprite.setFrame(base + offset).setFlipX(this.facing === 'right');
   }
@@ -62,19 +73,25 @@ class Walker {
     this.frame(1 + this.stepParity);
     this.sprite.setDepth(Math.max(this.y, this.y - dy) * 10 + 5);
     scene.time.delayedCall(ms / 2, () => this.frame(0));
-    await tweenP(scene, {
-      targets: this.sprite, x: this.x * T + T / 2, y: this.y * T + T, duration: ms,
-    });
+    await tweenP(scene, { targets: this.sprite, x: this.x * T + T / 2, y: this.y * T + T, duration: ms });
     this.place();
     this.moving = false;
   }
+
+  destroy() {
+    this.sprite.destroy();
+  }
 }
 
-export class WorldScene extends Phaser.Scene {
+export class WorldScene extends Phaser.Scene implements ScriptApi {
+  private map!: MapDef;
   private player!: Walker;
-  private npcs = new Map<NpcId, Walker>();
+  private follower: Walker | null = null;
+  private npcs = new Map<string, Walker>();
+  private mapObjects: Phaser.GameObjects.GameObject[] = [];
   private grassOverlay!: Phaser.GameObjects.Image;
   private animated: { img: Phaser.GameObjects.Image; base: string }[] = [];
+  private evening!: Phaser.GameObjects.Rectangle;
   private busy = false;
   private turnUntil = 0;
   private ui!: UIScene;
@@ -83,22 +100,17 @@ export class WorldScene extends Phaser.Scene {
     super('world');
   }
 
+  get mapId(): MapId {
+    return this.map.id;
+  }
+
   create() {
-    this.npcs.clear();
-    this.animated = [];
     this.busy = false;
-    this.drawMap();
-
-    for (const n of NPCS) this.npcs.set(n.id, new Walker(this, n.look, n.x, n.y, n.facing));
-    const p = game.state.player;
-    this.player = new Walker(this, 'beryl', p.x, p.y, p.facing);
-    this.grassOverlay = this.add.image(0, 0, 't-tall-top').setOrigin(0).setVisible(false);
-    this.updateGrassOverlay();
-
-    const cam = this.cameras.main;
-    cam.setBounds(0, 0, MAP_W * T, MAP_H * T).setZoom(3).setRoundPixels(true);
-    cam.startFollow(this.player.sprite, true);
-    cam.setFollowOffset(0, 8);
+    this.scene.launch('ui');
+    this.ui = this.scene.get('ui') as UIScene;
+    this.cameras.main.setBackgroundColor('#000000');
+    this.evening = this.add.rectangle(0, 0, 4000, 4000, 0x1c2860, 0.42).setOrigin(0).setDepth(100000);
+    this.evening.setBlendMode(Phaser.BlendModes.MULTIPLY).setVisible(false);
 
     let frame = 0;
     this.time.addEvent({
@@ -108,57 +120,121 @@ export class WorldScene extends Phaser.Scene {
       },
     });
 
-    this.scene.launch('ui');
-    this.ui = this.scene.get('ui') as UIScene;
+    const p = game.state.player;
+    this.buildMap(p.map, p.x, p.y, p.facing);
     this.cameras.main.fadeIn(300);
-
-    if (!game.state.flags.intro) {
-      game.state.flags.intro = true;
-      void this.script(async () => {
-        await delay(this, 400);
-        await this.ui.say(
-          "GRANDMA: BERYL, dear! My old friend PROF. SPRUCE is visiting today.",
-          "He's waiting just outside the house. Go and say hello!",
-        );
-      });
-    }
+    // The UI scene finishes starting on the next frame; story scripts talk through it.
+    void this.script(async () => {
+      await delay(this, 50);
+      await onEnterMap(this);
+    });
   }
 
-  private drawMap() {
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
-        const c = tileAt(x, y);
-        let key = TILE_TEXTURES[c] ?? 't-grass';
-        if (c === 'W' && tileAt(x, y - 1) !== 'W') key = 't-damtop';
-        const img = this.add.image(x * T, y * T, key).setOrigin(0);
-        if (c === '~') this.animated.push({ img, base: 't-water' });
-        if (c === 'V') this.animated.push({ img, base: 't-spill' });
+  // --- map building -----------------------------------------------------------
+
+  private buildMap(id: MapId, x: number, y: number, facing: Facing) {
+    for (const o of this.mapObjects) o.destroy();
+    this.mapObjects = [];
+    this.animated = [];
+    for (const w of this.npcs.values()) w.destroy();
+    this.npcs.clear();
+    this.player?.destroy();
+    this.follower?.destroy();
+    this.follower = null;
+
+    this.map = MAPS[id];
+    game.state.player = { map: id, x, y, facing };
+    const add = <G extends Phaser.GameObjects.GameObject>(o: G) => {
+      this.mapObjects.push(o);
+      return o;
+    };
+
+    const rows = this.map.rows;
+    for (let ty = 0; ty < rows.length; ty++) {
+      for (let tx = 0; tx < rows[0].length; tx++) {
+        const img = add(this.add.image(tx * T, ty * T, this.textureFor(tx, ty)).setOrigin(0));
+        const c = rows[ty][tx];
+        if (this.map.kind === 'outdoor' && c === '~') this.animated.push({ img, base: 't-water' });
+        if (this.map.kind === 'outdoor' && c === 'V') this.animated.push({ img, base: 't-spill' });
       }
     }
-    for (const b of BUILDINGS) {
-      this.add.image(b.x * T, b.y * T, `b-${b.id}`).setOrigin(0).setDepth((b.y + b.h - 1) * 10 + 1);
+    for (const b of this.map.buildings) {
+      add(this.add.image(b.x * T, b.y * T, `b-${b.id}`).setOrigin(0).setDepth((b.y + b.h - 1) * 10 + 1));
+    }
+
+    this.player = new Walker(this, 'beryl', x, y, facing);
+    this.grassOverlay = add(this.add.image(0, 0, 't-tall-top').setOrigin(0).setVisible(false));
+    this.refresh();
+    this.updateGrassOverlay();
+
+    const cam = this.cameras.main;
+    const mw = rows[0].length * T, mh = rows.length * T;
+    const vw = cam.width / 3, vh = cam.height / 3;
+    cam.setZoom(3).setRoundPixels(true);
+    cam.setBounds(mw < vw ? (mw - vw) / 2 : 0, mh < vh ? (mh - vh) / 2 : 0, Math.max(mw, vw), Math.max(mh, vh));
+    cam.startFollow(this.player.sprite, true);
+    cam.setFollowOffset(0, 8);
+  }
+
+  private textureFor(x: number, y: number): string {
+    const m = this.map;
+    const c = tileAt(m, x, y);
+    if (m.kind === 'outdoor') {
+      if (c === 'W' && tileAt(m, x, y - 1) !== 'W') return 't-damtop';
+      return OUTDOOR_TEXTURES[c] ?? 't-grass';
+    }
+    if (c === 'b') return tileAt(m, x, y - 1) === 'b' ? 'i-bedbot' : 'i-bedtop';
+    if (c === 'T') {
+      const t = (dx: number, dy: number) => tileAt(m, x + dx, y + dy) === 'T';
+      return tableTexture(this, t(0, -1), t(1, 0), t(0, 1), t(-1, 0));
+    }
+    return INDOOR_TEXTURES[c] ?? 'i-floor';
+  }
+
+  /** Shows exactly the NPCs whose conditions hold now. */
+  refresh() {
+    const f = game.state.flags;
+    const wanted = new Map<string, NpcDef>();
+    for (const n of this.map.npcs) if (!n.when || n.when(f)) wanted.set(n.id, n);
+    for (const [id, w] of this.npcs) {
+      if (!wanted.has(id)) {
+        w.destroy();
+        this.npcs.delete(id);
+      }
+    }
+    for (const [id, n] of wanted) {
+      if (!this.npcs.has(id)) this.npcs.set(id, new Walker(this, n.look, n.x, n.y, n.facing));
+    }
+    // The family Pokémon follows Beryl around town in the morning.
+    const follow = !!f.parentsLeft && !f.gotStarter && !this.npcs.has('homemon');
+    if (follow && !this.follower) {
+      const [dx, dy] = DELTA[OPPOSITE[this.player.facing]];
+      const fx = this.player.x + dx, fy = this.player.y + dy;
+      const free = !this.blocked(fx, fy);
+      this.follower = new Walker(this, 'homemon', free ? fx : this.player.x, free ? fy : this.player.y, this.player.facing);
+      if (!free) this.follower.sprite.setVisible(false);
+    } else if (!follow && this.follower) {
+      this.follower.destroy();
+      this.follower = null;
     }
   }
 
-  private npcAt(x: number, y: number): NpcId | undefined {
+  private npcAt(x: number, y: number): string | undefined {
     for (const [id, w] of this.npcs) if (w.x === x && w.y === y) return id;
     return undefined;
   }
 
   private blocked(x: number, y: number) {
-    return isSolidTile(tileAt(x, y)) || this.npcAt(x, y) !== undefined;
+    return isSolidTile(tileAt(this.map, x, y)) || this.npcAt(x, y) !== undefined;
   }
 
   private updateGrassOverlay() {
-    const onGrass = tileAt(this.player.x, this.player.y) === ',';
+    const onGrass = this.map.kind === 'outdoor' && tileAt(this.map, this.player.x, this.player.y) === ',';
     this.grassOverlay.setVisible(onGrass);
-    if (onGrass) {
-      this.grassOverlay.setPosition(this.player.x * T, this.player.y * T).setDepth(this.player.y * 10 + 6);
-    }
+    if (onGrass) this.grassOverlay.setPosition(this.player.x * T, this.player.y * T).setDepth(this.player.y * 10 + 6);
   }
 
-  /** Runs a scripted sequence with player control locked. */
-  private async script(fn: () => Promise<void>) {
+  private async script(fn: () => Promise<unknown>) {
     this.busy = true;
     try {
       await fn();
@@ -166,6 +242,8 @@ export class WorldScene extends Phaser.Scene {
       this.busy = false;
     }
   }
+
+  // --- player control -----------------------------------------------------------
 
   update(time: number) {
     if (this.busy || this.player.moving) return;
@@ -195,22 +273,95 @@ export class WorldScene extends Phaser.Scene {
     const [dx, dy] = DELTA[dir];
     const nx = this.player.x + dx, ny = this.player.y + dy;
     if (this.blocked(nx, ny)) return;
-    if (tileAt(nx, ny) === ',' && game.state.party.length === 0) {
-      await this.script(() => this.ui.say("JASPER: Hey, BERYL! Don't go into the tall grass without a POKéMON!"));
+    if (tileAt(this.map, nx, ny) === ',' && game.state.party.length === 0) {
+      await this.script(() => onStepGrassWithoutPokemon(this));
       return;
     }
-    // Holding B (X key) runs, from the very start of the game.
-    await this.player.step(this, dir, isHeld('b'));
-    game.state.player = { x: this.player.x, y: this.player.y, facing: this.player.facing };
+    const from = { x: this.player.x, y: this.player.y };
+    const running = isHeld('b');
+    const steps = [this.player.step(this, dir, running)];
+    if (this.follower) {
+      const f = this.follower;
+      const fdx = from.x - f.x, fdy = from.y - f.y;
+      const fdir: Facing = fdx > 0 ? 'right' : fdx < 0 ? 'left' : fdy > 0 ? 'down' : 'up';
+      if (fdx || fdy) steps.push(f.step(this, fdir, running));
+      f.sprite.setVisible(true);
+    }
+    await Promise.all(steps);
+    game.state.player = { map: this.map.id, x: this.player.x, y: this.player.y, facing: this.player.facing };
     this.updateGrassOverlay();
-    if (tileAt(this.player.x, this.player.y) === ',' && Math.random() < ENCOUNTER_RATE) {
+
+    const warp = this.map.warps.find((w) => w.x === this.player.x && w.y === this.player.y);
+    if (warp) {
+      await this.script(async () => {
+        await this.warp(warp.to, warp.tx, warp.ty, warp.facing);
+        await onEnterMap(this);
+      });
+      return;
+    }
+    if (this.map.encounters && tileAt(this.map, this.player.x, this.player.y) === ',' && Math.random() < ENCOUNTER_RATE) {
       await this.script(() => this.wildEncounter());
     }
   }
 
-  // --- battles -------------------------------------------------------------------
+  private async interact(x: number, y: number) {
+    const npc = this.npcAt(x, y);
+    if (npc) {
+      this.faceBeryl(npc);
+      if (await onTalk(this, npc)) return;
+      const def = this.map.npcs.find((n) => n.id === npc);
+      return this.say(`${def?.name ?? '...'}: ...`);
+    }
+    const text = this.map.inspect[`${x},${y}`];
+    if (text) return this.say(text.join('\n'));
+    const c = tileAt(this.map, x, y);
+    if (this.map.kind === 'outdoor' && c === '~') return this.say('The LETHYS flows past, cold and clear.');
+  }
 
-  private startBattle(cfg: Omit<BattleConfig, 'onEnd'>): Promise<BattleResult> {
+  private async wildEncounter() {
+    const list = this.map.encounters!;
+    const total = list.reduce((a, [, w]) => a + w, 0);
+    let roll = Math.random() * total;
+    const species = list.find(([, w]) => (roll -= w) < 0)?.[0] ?? list[0][0];
+    const enemy = createPokemon(species, wildLevel(game.state.badges, Math.random));
+    const result = await this.battle({ kind: 'wild', enemy });
+    if (result === 'lose') await this.whiteOut();
+    save();
+  }
+
+  private async startMenu() {
+    const choice = await this.ui.menu(['POKéMON', 'SAVE', 'EXIT']);
+    if (choice === 0) {
+      if (game.state.party.length === 0) return this.say("You don't have any POKéMON yet.");
+      for (const p of game.state.party) {
+        const st = calcStats(p);
+        const sp = SPECIES[p.species];
+        await this.say(
+          `${sp.name.toUpperCase()}  Lv${p.level}  ${sp.types.join('/').toUpperCase()}\nHP ${p.hp}/${st.hp}`,
+          `Moves: ${p.moves.map((m) => MOVES[m.id].name.toUpperCase()).join(', ')}`,
+        );
+      }
+    } else if (choice === 1) {
+      save();
+      await this.say('BERYL saved the game.');
+    }
+  }
+
+  // --- ScriptApi --------------------------------------------------------------------
+
+  say(...lines: string[]) {
+    return this.ui.say(...lines);
+  }
+
+  yesNo(q: string) {
+    return this.ui.yesNo(q);
+  }
+
+  pickStarter() {
+    return this.ui.pickStarter();
+  }
+
+  battle(cfg: Omit<BattleConfig, 'onEnd'>): Promise<BattleResult> {
     return new Promise((resolve) => {
       const cam = this.cameras.main;
       cam.flash(250, 255, 255, 255);
@@ -220,6 +371,7 @@ export class WorldScene extends Phaser.Scene {
           this.scene.sleep('ui');
           this.scene.sleep();
           this.scene.launch('battle', {
+            bg: this.map.kind === 'indoor' ? 'indoor' : 'plain',
             ...cfg,
             onEnd: (result: BattleResult) => {
               this.scene.wake();
@@ -233,175 +385,98 @@ export class WorldScene extends Phaser.Scene {
     });
   }
 
-  private async wildEncounter() {
-    const total = ENCOUNTERS.reduce((a, [, w]) => a + w, 0);
-    let roll = Math.random() * total;
-    const species = ENCOUNTERS.find(([, w]) => (roll -= w) < 0)?.[0] ?? ENCOUNTERS[0][0];
-    const enemy = createPokemon(species, wildLevel(game.state.badges, Math.random));
-    const result = await this.startBattle({ kind: 'wild', enemy });
-    if (result === 'lose') await this.whiteOut();
-    save();
+  private walker(who: string): Walker | undefined {
+    if (who === 'player') return this.player;
+    if (who === 'follower') return this.follower ?? undefined;
+    return this.npcs.get(who);
   }
 
-  private async whiteOut() {
+  async walk(who: string, dirs: Facing[]) {
+    const w = this.walker(who);
+    if (!w) return;
+    for (const d of dirs) await w.step(this, d);
+    if (w === this.player) {
+      game.state.player = { map: this.map.id, x: w.x, y: w.y, facing: w.facing };
+      this.updateGrassOverlay();
+    }
+  }
+
+  face(who: string, dir: Facing) {
+    this.walker(who)?.face(dir);
+  }
+
+  faceBeryl(who: string) {
+    const w = this.walker(who);
+    if (!w) return;
+    const dx = this.player.x - w.x, dy = this.player.y - w.y;
+    w.face(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up');
+  }
+
+  async emote(who: string, kind: 'heart' | 'exclaim') {
+    const w = this.walker(who);
+    if (!w) return;
+    const icon = this.add.image(w.sprite.x, w.sprite.y - 26, kind === 'heart' ? 'fx-heart' : 'fx-exclaim')
+      .setDepth(99999).setScale(0.2);
+    await tweenP(this, { targets: icon, scale: 1, duration: 160, ease: 'Back.easeOut' });
+    await delay(this, 700);
+    icon.destroy();
+  }
+
+  async warp(map: MapId, x: number, y: number, facing: Facing, whileDark?: () => void) {
+    await this.fadeOut(200);
+    this.buildMap(map, x, y, facing);
+    whileDark?.();
+    await this.fadeIn(200);
+  }
+
+  fadeOut(ms = 300): Promise<void> {
+    return new Promise((resolve) => {
+      this.cameras.main.fadeOut(ms, 0, 0, 0);
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_OUT_COMPLETE, () => resolve());
+    });
+  }
+
+  fadeIn(ms = 300): Promise<void> {
+    return new Promise((resolve) => {
+      this.cameras.main.fadeIn(ms, 0, 0, 0);
+      this.cameras.main.once(Phaser.Cameras.Scene2D.Events.FADE_IN_COMPLETE, () => resolve());
+    });
+  }
+
+  setEvening(on: boolean) {
+    this.evening.setVisible(on);
+  }
+
+  async lethysAppears(x: number, y: number) {
+    const cx = x * T + T / 2, cy = y * T + T;
+    const ripples = [0, 1, 2].map((i) =>
+      this.add.ellipse(cx, cy - 2, 8, 3).setStrokeStyle(1, 0xd8f0ff, 0.9).setDepth(y * 10 + 2).setAlpha(0).setData('i', i));
+    for (const rp of ripples) {
+      this.tweens.add({
+        targets: rp, scaleX: 4, scaleY: 3, alpha: { from: 0.9, to: 0 }, duration: 1200,
+        delay: (rp.getData('i') as number) * 350, repeat: 2,
+      });
+    }
+    const mon = this.add.image(cx, cy + 24, 'mon-lethys').setOrigin(0.5, 1).setScale(0.75).setAlpha(0)
+      .setDepth(y * 10 + 3);
+    const mask = this.add.graphics().fillRect(cx - 40, cy - 80, 80, 80).setVisible(false);
+    mon.setMask(mask.createGeometryMask());
+    await tweenP(this, { targets: mon, y: cy, alpha: 0.95, duration: 1400, ease: 'Sine.easeOut' });
+    this.tweens.add({ targets: mon, y: cy - 3, duration: 700, yoyo: true, repeat: 1, ease: 'Sine.easeInOut' });
+    await delay(this, 2200);
+    await tweenP(this, { targets: mon, y: cy + 48, alpha: 0, duration: 1100, ease: 'Sine.easeIn' });
+    mon.destroy();
+    mask.destroy();
+    for (const rp of ripples) rp.destroy();
+  }
+
+  wait(ms: number) {
+    return delay(this, ms);
+  }
+
+  async whiteOut() {
     for (const p of game.state.party) heal(p);
-    game.state.player = { ...START_POSITION };
-    this.player.x = START_POSITION.x;
-    this.player.y = START_POSITION.y;
-    this.player.place();
-    this.player.face('down');
-    this.updateGrassOverlay();
-    await this.ui.say('GRANDMA: Oh my, BERYL! You look exhausted.', 'Your POKéMON have had a good rest now. Be careful out there!');
-  }
-
-  // --- interaction -----------------------------------------------------------------
-
-  private async interact(x: number, y: number) {
-    const npc = this.npcAt(x, y);
-    if (npc) {
-      this.npcs.get(npc)!.face(OPPOSITE[this.player.facing]);
-      return this.talk(npc);
-    }
-    const sign = SIGNS[`${x},${y}`];
-    if (sign) return this.ui.say(sign.join('\n'));
-    const door = BUILDINGS.find((b) => b.door.x === x && b.door.y === y);
-    if (door) return this.door(door.id);
-    const c = tileAt(x, y);
-    if (c === 'E') return this.ui.say("It's locked. A plate reads: MIRRORMERE DAM - STAFF ONLY.");
-    if (c === '~') return this.ui.say('The LETHYS flows past, cold and clear.');
-  }
-
-  private async door(id: 'home' | 'jasper' | 'gym') {
-    const s = game.state;
-    if (id === 'home') {
-      if (s.party.length === 0) {
-        return this.ui.say("GRANDMA: PROF. SPRUCE is waiting outside, dear. Don't keep him waiting!");
-      }
-      for (const p of s.party) heal(p);
-      save();
-      return this.ui.say(
-        'GRANDMA: Welcome home, dear. Let your POKéMON rest a little.',
-        'Your POKéMON are fully healed! (Game saved.)',
-      );
-    }
-    if (id === 'jasper') return this.ui.say("It's JASPER's house. His mum is at work at the POKéMON PENSION.");
-    return this.ui.say("The GYM is locked. A note says: 'Closed today. Come back with a stronger team!'");
-  }
-
-  private async talk(id: NpcId) {
-    const s = game.state;
-    switch (id) {
-      case 'spruce':
-        if (s.party.length === 0) return this.starterEvent();
-        return this.ui.say(
-          'PROF. SPRUCE: The LETHYS carries more than water, you know. Old stories, too...',
-          'Ask your grandma about it sometime.',
-        );
-      case 'jasper':
-        if (s.party.length === 0) return this.ui.say('JASPER: BERYL! The professor is here! Go talk to him, quick!');
-        return this.ui.say(
-          s.flags.rivalWon
-            ? "JASPER: Told you I'd win! But don't worry, you'll get me next time... maybe."
-            : 'JASPER: Next time I win, for sure! I\'ll train way harder than you.',
-          'JASPER: My dad says a real trainer needs all eight badges. I\'m getting them first!',
-        );
-      case 'guard':
-        return this.ui.say(
-          "DAM GUARD: Sorry, kid. Staff only beyond this door.",
-          'Your mum and dad are hard at work in there today.',
-        );
-      case 'fisher':
-        return this.fisherman();
-      case 'neighbor':
-        return this.ui.say(
-          'NEIGHBOR: Have you heard? People keep seeing ghost POKéMON by the river at night.',
-          "My grandmother said the river wasn't always this quiet...",
-        );
-    }
-  }
-
-  private async starterEvent() {
-    const ui = this.ui;
-    await ui.say(
-      'PROF. SPRUCE: Ah, you must be BERYL! Your grandma and I have been friends since we were your age.',
-      'She tells me you already know a thing or two about POKéMON.',
-      'I study how POKéMON live along the LETHYS. And I brought three young ones who need a good home.',
-    );
-    await this.npcs.get('jasper')!.face('right');
-    await ui.say(
-      'JASPER: Whoa, for real? Professor, can I have one too?!',
-      'PROF. SPRUCE: Ha ha! Of course. But BERYL chooses first.',
-    );
-
-    const starter = await ui.pickStarter();
-    const mon = createPokemon(starter, 5);
-    game.state.party.push(mon);
-    await ui.say(`BERYL received ${nameOf(mon)}!`);
-
-    // Like a Gen III rival, Jasper's starter hasn't learned its type move yet.
-    const rival = createPokemon(rivalStarterFor(starter), 5);
-    rival.moves = movesKnownAt(rival.species, 4).map((id) => ({ id, pp: MOVES[id].pp }));
-    this.npcs.get('jasper')!.face('right');
-    await ui.say(
-      `JASPER: Then I'll take this one! ${nameOf(rival)}, you're with me!`,
-      "JASPER: Hey, BERYL! Let's see whose POKéMON is stronger!",
-    );
-
-    const result = await this.startBattle({ kind: 'trainer', trainerName: 'JASPER', enemy: rival, canLose: true });
-    game.state.flags.rivalBattle = true;
-    game.state.flags.rivalWon = result !== 'win';
-    await ui.say(
-      result === 'win'
-        ? "JASPER: Aw, no way! Okay, okay... I'll train harder and beat you next time!"
-        : 'JASPER: Yes! I won! Don\'t feel bad, BERYL. You\'ll get me next time.',
-      'PROF. SPRUCE: What a splendid first battle, both of you! Let me patch your POKéMON up.',
-    );
-    heal(mon);
-    await ui.say(
-      'Your POKéMON were fully healed!',
-      'PROF. SPRUCE: If your POKéMON get tired, rest at home. Your grandma will look after you.',
-      'The tall grass east of the bridge is full of wild POKéMON. Go and explore!',
-    );
-    save();
-  }
-
-  private async fisherman() {
-    const s = game.state;
-    if (s.party.length === 0) {
-      return this.ui.say("FISHERMAN: The fish are biting today! Come back with a POKéMON and I'll show you my catch.");
-    }
-    if (s.flags.fisherBattle) {
-      return this.ui.say(
-        "FISHERMAN: MURKFIN don't look like much. But my grandpa swore...",
-        'the ones that grow up in the strong current below the dam turn into something else entirely!',
-      );
-    }
-    await this.ui.say('FISHERMAN: The LETHYS ran wild before the dam, my grandpa said. Look what I just fished up!');
-    if (!(await this.ui.yesNo('FISHERMAN: Want to battle my MURKFIN?'))) {
-      return this.ui.say('FISHERMAN: Suit yourself!');
-    }
-    const result = await this.startBattle({ kind: 'trainer', trainerName: 'FISHERMAN', enemy: createPokemon('murkfin', 5) });
-    if (result === 'lose') return this.whiteOut();
-    s.flags.fisherBattle = true;
-    await this.ui.say('FISHERMAN: Ha! Fair and square. MURKFIN is better at splashing than battling.');
-    save();
-  }
-
-  private async startMenu() {
-    const choice = await this.ui.menu(['POKéMON', 'SAVE', 'EXIT']);
-    if (choice === 0) {
-      if (game.state.party.length === 0) return this.ui.say("You don't have any POKéMON yet.");
-      for (const p of game.state.party) {
-        const st = calcStats(p);
-        const sp = SPECIES[p.species];
-        await this.ui.say(
-          `${nameOf(p)}  Lv${p.level}  ${sp.types.join('/').toUpperCase()}\nHP ${p.hp}/${st.hp}`,
-          `Moves: ${p.moves.map((m) => MOVES[m.id].name.toUpperCase()).join(', ')}`,
-        );
-      }
-    } else if (choice === 1) {
-      save();
-      await this.ui.say('BERYL saved the game.');
-    }
+    await this.warp(HOME_DOOR.map, HOME_DOOR.x, HOME_DOOR.y, HOME_DOOR.facing);
+    await this.say('GRANDMA: Oh my, BERYL! You look exhausted.', 'Your POKéMON have had a good rest now. Be careful out there!');
   }
 }

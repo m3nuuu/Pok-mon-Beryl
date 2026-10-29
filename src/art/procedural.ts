@@ -1,7 +1,7 @@
 // Placeholder pixel art drawn in code, so the prototype ships with no third-party assets.
 // Every texture here is meant to be replaced by real tiles/sprites later.
 import Phaser from 'phaser';
-import { BUILDINGS, type Building } from '../data/stillbrook';
+import { MAPS, type Building } from '../data/maps';
 
 type Ctx = CanvasRenderingContext2D;
 
@@ -163,6 +163,7 @@ const ROOFS: Record<Building['id'], [string, string]> = {
   home: ['#d05848', '#983830'],
   jasper: ['#4878c8', '#30508c'],
   gym: ['#7c8898', '#505868'],
+  pension: ['#58a858', '#387838'],
 };
 
 function building(c: Ctx, b: Building) {
@@ -234,6 +235,12 @@ export interface Look {
 }
 
 export const LOOKS: Record<string, Look> = {
+  mum: { h: '#6a4028', H: '#40241a', c: '#e8a050', C: '#b07030', p: '#405880', b: '#503828' },
+  dad: { h: '#3a2a20', H: '#201410', c: '#5878a8', C: '#3a5480', p: '#4a4a52', b: '#2a2a2a' },
+  grandma: { h: '#e8e8f0', H: '#b0b0c0', c: '#9868b0', C: '#6c4888', p: '#585068', b: '#403040' },
+  jasperDad: { h: '#d86828', H: '#983c10', c: '#f4f4f4', C: '#c8c8d0', p: '#303030', b: '#202020' },
+  jasperMom: { h: '#e88838', H: '#a85818', c: '#68b878', C: '#408850', p: '#f0e8d8', b: '#705030' },
+  ferry: { h: '#a8a8a8', H: '#707070', c: '#304060', C: '#1c2840', p: '#705838', b: '#302018' },
   beryl: { h: '#4a3020', H: '#2a1810', c: '#30a898', C: '#1c7068', p: '#383848', b: '#e8e8f0' },
   jasper: { h: '#e07830', H: '#a04818', c: '#d84040', C: '#902828', p: '#3858a8', b: '#383838' },
   spruce: { h: '#d0d0d8', H: '#909098', c: '#f8f8f8', C: '#b8b8c8', p: '#806040', b: '#503020' },
@@ -284,11 +291,254 @@ export function generateArt(scene: Phaser.Scene): void {
   canvasTexture(scene, 't-bridge', 16, 16, bridge);
   canvasTexture(scene, 't-fence', 16, 16, fence);
   canvasTexture(scene, 't-sign', 16, 16, sign);
-  for (const b of BUILDINGS) canvasTexture(scene, `b-${b.id}`, b.w * 16, b.h * 16, (c) => building(c, b));
+  for (const b of MAPS.stillbrook.buildings) canvasTexture(scene, `b-${b.id}`, b.w * 16, b.h * 16, (c) => building(c, b));
+  canvasTexture(scene, 't-dock', 16, 16, dock);
+  generateInterior(scene);
+  homeMonSheet(scene);
+  canvasTexture(scene, 'fx-heart', 16, 16, heartBubble);
+  canvasTexture(scene, 'fx-exclaim', 16, 16, exclaimBubble);
   for (const [key, look] of Object.entries(LOOKS)) characterSheet(scene, `c-${key}`, look);
   // tall-grass overlay drawn over a walker's legs
   canvasTexture(scene, 't-tall-top', 16, 16, (c) => {
     tallGrass(c);
     c.clearRect(0, 0, 16, 8);
   });
+}
+
+function dock(c: Ctx) {
+  water(c, 0);
+  r(c, 1, 0, 14, 16, '#b88850');
+  for (let y = 3; y < 16; y += 4) r(c, 1, y, 14, 1, '#7a5430');
+  r(c, 1, 0, 1, 16, '#6a4628');
+  r(c, 14, 0, 1, 16, '#6a4628');
+}
+
+// --- interiors --------------------------------------------------------------
+
+function floor(c: Ctx) {
+  r(c, 0, 0, 16, 16, '#d0a468');
+  for (const y of [3, 7, 11, 15]) r(c, 0, y, 16, 1, '#b08048');
+  for (const [x, y] of [[5, 0], [12, 4], [3, 8], [10, 12]]) r(c, x, y, 1, 3, '#b08048');
+  r(c, 0, 0, 16, 1, '#dcb478');
+}
+
+function wall(c: Ctx) {
+  r(c, 0, 0, 16, 16, '#efe0bc');
+  for (const x of [2, 7, 12]) r(c, x, 0, 2, 12, '#e2cfa4');
+  r(c, 0, 12, 16, 4, '#a87850');
+  r(c, 0, 12, 16, 1, '#c89868');
+}
+
+function voidTile(c: Ctx) {
+  r(c, 0, 0, 16, 16, '#302830');
+  r(c, 0, 15, 16, 1, '#4a3e48');
+}
+
+function windowTile(c: Ctx) {
+  wall(c);
+  r(c, 3, 2, 10, 9, '#6a5040');
+  r(c, 4, 3, 8, 7, '#a0d0f0');
+  r(c, 4, 3, 3, 2, '#e0f4ff');
+  r(c, 7, 3, 1, 7, '#6a5040');
+}
+
+function shelfToy(c: Ctx) {
+  wall(c);
+  r(c, 1, 9, 14, 2, '#8a5a30');
+  // a little teal serpent plush (Lethys)
+  const teal = '#2a8c8c', dark = '#1a5c60';
+  r(c, 4, 4, 3, 2, teal);
+  r(c, 6, 5, 2, 3, teal);
+  r(c, 8, 6, 3, 2, teal);
+  r(c, 10, 4, 2, 3, teal);
+  r(c, 4, 6, 2, 3, dark);
+  r(c, 5, 4, 1, 1, '#f8f8f8');
+}
+
+function bookshelf(c: Ctx) {
+  r(c, 0, 0, 16, 16, '#7a4a28');
+  r(c, 1, 1, 14, 14, '#5a3418');
+  const colors = ['#c84848', '#4878c8', '#58a858', '#e0b040', '#9868b0'];
+  for (const row of [2, 8]) {
+    for (let x = 2, i = row; x < 14; x += 2, i++) r(c, x, row, 2, 5, colors[i % colors.length]);
+    r(c, 1, row + 5, 14, 1, '#7a4a28');
+  }
+}
+
+function bed(c: Ctx, head: boolean) {
+  floor(c);
+  r(c, 1, 0, 14, 16, '#7a4a28');
+  r(c, 2, head ? 2 : 0, 12, head ? 14 : 13, '#4a90c8');
+  if (head) {
+    r(c, 3, 3, 10, 5, '#f8f8f8');
+    r(c, 3, 7, 10, 1, '#c8c8d8');
+  } else {
+    r(c, 2, 0, 12, 1, '#68a8d8');
+    r(c, 2, 12, 12, 1, '#30709c');
+  }
+}
+
+function counter(c: Ctx) {
+  floor(c);
+  r(c, 0, 0, 16, 12, '#8890a0');
+  r(c, 0, 0, 16, 5, '#d8d8e0');
+  r(c, 0, 5, 16, 1, '#a8a8b8');
+  r(c, 3, 7, 3, 3, '#606878');
+  r(c, 10, 7, 3, 3, '#606878');
+  r(c, 0, 12, 16, 1, '#606878');
+}
+
+function plant(c: Ctx) {
+  floor(c);
+  r(c, 5, 10, 6, 5, '#b86838');
+  r(c, 5, 10, 6, 1, '#d88858');
+  r(c, 4, 2, 8, 8, '#3c8c40');
+  r(c, 6, 1, 4, 2, '#58b058');
+  r(c, 3, 5, 2, 3, '#58b058');
+  r(c, 11, 4, 2, 3, '#58b058');
+}
+
+function tv(c: Ctx) {
+  floor(c);
+  r(c, 2, 4, 12, 9, '#303038');
+  r(c, 3, 5, 10, 6, '#70b8e8');
+  r(c, 3, 5, 4, 2, '#b8e0f8');
+  r(c, 4, 13, 8, 2, '#505058');
+}
+
+function penFence(c: Ctx) {
+  floor(c);
+  r(c, 0, 5, 16, 2, '#c09060');
+  r(c, 0, 10, 16, 2, '#c09060');
+  r(c, 2, 2, 2, 12, '#8a6038');
+  r(c, 12, 2, 2, 12, '#8a6038');
+}
+
+function exitMat(c: Ctx) {
+  floor(c);
+  r(c, 1, 3, 14, 10, '#b84040');
+  r(c, 2, 4, 12, 8, '#d86060');
+  for (const y of [6, 9]) r(c, 2, y, 12, 1, '#b84040');
+}
+
+/** Table tiles join up: edges are drawn only where the neighbour isn't table. */
+export function tableTexture(scene: Phaser.Scene, n: boolean, e: boolean, s: boolean, w: boolean): string {
+  const key = `t-table-${+n}${+e}${+s}${+w}`;
+  canvasTexture(scene, key, 16, 16, (c) => {
+    floor(c);
+    r(c, 0, 0, 16, 16, '#b07040');
+    r(c, 0, 0, 16, 16, '#c88850');
+    if (!n) r(c, 0, 0, 16, 2, '#e0a868');
+    if (!s) r(c, 0, 12, 16, 4, '#8a5028');
+    if (!w) r(c, 0, 0, 1, 16, '#8a5028');
+    if (!e) r(c, 15, 0, 1, 16, '#8a5028');
+  });
+  return key;
+}
+
+function generateInterior(scene: Phaser.Scene) {
+  canvasTexture(scene, 'i-floor', 16, 16, floor);
+  canvasTexture(scene, 'i-wall', 16, 16, wall);
+  canvasTexture(scene, 'i-void', 16, 16, voidTile);
+  canvasTexture(scene, 'i-window', 16, 16, windowTile);
+  canvasTexture(scene, 'i-shelf', 16, 16, shelfToy);
+  canvasTexture(scene, 'i-books', 16, 16, bookshelf);
+  canvasTexture(scene, 'i-bedtop', 16, 16, (c) => bed(c, true));
+  canvasTexture(scene, 'i-bedbot', 16, 16, (c) => bed(c, false));
+  canvasTexture(scene, 'i-counter', 16, 16, counter);
+  canvasTexture(scene, 'i-plant', 16, 16, plant);
+  canvasTexture(scene, 'i-tv', 16, 16, tv);
+  canvasTexture(scene, 'i-pen', 16, 16, penFence);
+  canvasTexture(scene, 'i-mat', 16, 16, exitMat);
+}
+
+// --- the family Pokémon (placeholder until it is designed) -----------------
+// A small, round stone-shelled creature, drawn as a stand-in.
+
+const MON_DOWN = [
+  '................',
+  '................',
+  '.....kkkkkk.....',
+  '....kggGGggk....',
+  '...kgGmmmmGgk...',
+  '...kgmmmmmmgk...',
+  '..kfffffffffk...',
+  '..kfwefffwefk...',
+  '..kffffnffffk...',
+  '..kfffffffffk...',
+  '...kfffffffk....',
+  '...kFk...kFk....',
+  '....k.....k.....',
+];
+const MON_UP = [
+  '................',
+  '................',
+  '.....kkkkkk.....',
+  '....kggGGggk....',
+  '...kgGmmmmGgk...',
+  '...kgmmmmmmgk...',
+  '..kgggmmmgggk...',
+  '..kgGGgggGGgk...',
+  '..kggggggggk....',
+  '..kffffffffk....',
+  '...kfffffffk....',
+  '...kFk...kFk....',
+  '....k.....k.....',
+];
+const MON_SIDE = [
+  '................',
+  '................',
+  '......kkkkkk....',
+  '.....kggGGggk...',
+  '....kgGmmmmGgk..',
+  '...kkgmmmmmmgk..',
+  '..kffkggggggk...',
+  '.kwefffgGGgk....',
+  '.kfnffffgggk....',
+  '..kfffffffk.....',
+  '...kffffffk.....',
+  '...kFk..kFk.....',
+  '....k....k......',
+];
+
+function homeMonSheet(scene: Phaser.Scene) {
+  const pal: Record<string, string> = {
+    k: '#283028', g: '#8c8c98', G: '#6a6a78', m: '#5aa848', f: '#d8a868', F: '#a87840',
+    w: '#f8f8f8', e: '#202028', n: '#704030',
+  };
+  const frames = [MON_DOWN, MON_DOWN, MON_DOWN, MON_UP, MON_UP, MON_UP, MON_SIDE, MON_SIDE, MON_SIDE];
+  const tex = canvasTexture(scene, 'c-homemon', 16 * 9, 24, (c) => {
+    frames.forEach((art, i) => {
+      const bob = i % 3 === 0 ? 0 : 1;
+      art.forEach((row, y) => [...row].forEach((ch, x) => {
+        const col = pal[ch];
+        if (col) r(c, i * 16 + x, 10 + y + bob, 1, 1, col);
+      }));
+    });
+  });
+  frames.forEach((_, i) => tex.add(i, 0, i * 16, 0, 16, 24));
+}
+
+function bubble(c: Ctx) {
+  r(c, 2, 0, 12, 12, '#202028');
+  r(c, 3, 1, 10, 10, '#f8f8f8');
+  r(c, 6, 12, 4, 2, '#202028');
+  r(c, 7, 12, 2, 1, '#f8f8f8');
+}
+
+function heartBubble(c: Ctx) {
+  bubble(c);
+  const red = '#e04858';
+  r(c, 5, 3, 2, 2, red);
+  r(c, 9, 3, 2, 2, red);
+  r(c, 4, 4, 8, 3, red);
+  r(c, 5, 7, 6, 1, red);
+  r(c, 6, 8, 4, 1, red);
+  r(c, 7, 9, 2, 1, red);
+}
+
+function exclaimBubble(c: Ctx) {
+  bubble(c);
+  r(c, 7, 2, 2, 6, '#e04858');
+  r(c, 7, 9, 2, 1, '#e04858');
 }

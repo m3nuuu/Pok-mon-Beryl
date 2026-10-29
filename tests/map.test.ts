@@ -1,52 +1,68 @@
 import { describe, expect, it } from 'vitest';
-import { BUILDINGS, MAP_H, MAP_W, NPCS, SIGNS, STILLBROOK_ROWS, isSolidTile, tileAt } from '../src/data/stillbrook';
-import { START_POSITION } from '../src/state';
+import { MAPS, isSolidTile, tileAt, type MapDef } from '../src/data/maps';
+import { HOME_DOOR, START_POSITION } from '../src/state';
 
-describe('Stillbrook map', () => {
+const all = Object.values(MAPS);
+const STEPS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+function reachable(map: MapDef, x: number, y: number): Set<string> {
+  const seen = new Set<string>();
+  const queue = [[x, y]];
+  while (queue.length) {
+    const [cx, cy] = queue.pop()!;
+    const k = `${cx},${cy}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    for (const [dx, dy] of STEPS) if (!isSolidTile(tileAt(map, cx + dx, cy + dy))) queue.push([cx + dx, cy + dy]);
+  }
+  return seen;
+}
+
+describe.each(all.map((m) => [m.id, m] as const))('%s map', (_, map) => {
   it('is rectangular', () => {
-    for (const row of STILLBROOK_ROWS) expect(row.length).toBe(MAP_W);
+    for (const row of map.rows) expect(row.length).toBe(map.rows[0].length);
   });
 
-  it('places buildings on B tiles with a reachable door', () => {
-    for (const b of BUILDINGS) {
+  it('places buildings on B tiles with a door', () => {
+    for (const b of map.buildings) {
       for (let y = b.y; y < b.y + b.h; y++)
-        for (let x = b.x; x < b.x + b.w; x++) expect(tileAt(x, y), `${b.id} ${x},${y}`).toBe('B');
-      expect(isSolidTile(tileAt(b.door.x, b.door.y + 1))).toBe(false);
+        for (let x = b.x; x < b.x + b.w; x++) {
+          const isDoor = x === b.door.x && y === b.door.y;
+          expect(tileAt(map, x, y), `${b.id} ${x},${y}`).toBe(isDoor ? 'D' : 'B');
+        }
     }
   });
 
-  it('has signs where the text is', () => {
-    for (const key of Object.keys(SIGNS)) {
-      const [x, y] = key.split(',').map(Number);
-      expect(tileAt(x, y)).toBe('S');
+  it('has warps on doors or mats that land on walkable tiles', () => {
+    for (const w of map.warps) {
+      expect(['D', 'X']).toContain(tileAt(map, w.x, w.y));
+      const target = MAPS[w.to];
+      expect(isSolidTile(tileAt(target, w.tx, w.ty)), `${w.to} ${w.tx},${w.ty}`).toBe(false);
+      expect(target.warps.some((back) => back.to === map.id), `${w.to} leads back`).toBe(true);
     }
   });
 
-  it('puts NPCs and the player on walkable tiles', () => {
-    for (const n of NPCS) expect(isSolidTile(tileAt(n.x, n.y)), n.id).toBe(false);
-    expect(isSolidTile(tileAt(START_POSITION.x, START_POSITION.y))).toBe(false);
-  });
-
-  it('lets the player reach every NPC and the tall grass', () => {
+  it('puts every NPC where the player can talk to it', () => {
+    const entry = map.warps.length ? map.warps.map((w) => MAPS[w.to].warps.find((b) => b.to === map.id)!) : [];
+    const starts = entry.map((w) => [w.tx, w.ty]);
     const seen = new Set<string>();
-    const queue = [[START_POSITION.x, START_POSITION.y]];
-    const npc = new Set(NPCS.map((n) => `${n.x},${n.y}`));
-    while (queue.length) {
-      const [x, y] = queue.pop()!;
-      const k = `${x},${y}`;
-      if (seen.has(k)) continue;
-      seen.add(k);
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = x + dx, ny = y + dy;
-        if (nx < 0 || ny < 0 || nx >= MAP_W || ny >= MAP_H) continue;
-        if (isSolidTile(tileAt(nx, ny)) || npc.has(`${nx},${ny}`)) continue;
-        queue.push([nx, ny]);
-      }
+    for (const [x, y] of starts) for (const k of reachable(map, x, y)) seen.add(k);
+    for (const w of map.warps) expect(seen.has(`${w.x},${w.y}`), `warp ${w.x},${w.y}`).toBe(true);
+    // Pokémon in the pension pens are looked at over the fence instead.
+    for (const n of map.npcs.filter((n) => !n.look.startsWith('mon-'))) {
+      expect(isSolidTile(tileAt(map, n.x, n.y)), n.id).toBe(false);
+      expect(STEPS.some(([dx, dy]) => seen.has(`${n.x + dx},${n.y + dy}`)), n.id).toBe(true);
     }
-    for (const n of NPCS) {
-      const adj = [[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dx, dy]) => seen.has(`${n.x + dx},${n.y + dy}`));
-      expect(adj, n.id).toBe(true);
-    }
-    expect([...seen].some((k) => { const [x, y] = k.split(',').map(Number); return tileAt(x, y) === ','; })).toBe(true);
+  });
+});
+
+describe('world', () => {
+  it('starts and respawns on walkable tiles', () => {
+    for (const p of [START_POSITION, HOME_DOOR]) expect(isSolidTile(tileAt(MAPS[p.map], p.x, p.y))).toBe(false);
+  });
+
+  it('lets the player reach the tall grass in Stillbrook', () => {
+    const seen = reachable(MAPS.stillbrook, HOME_DOOR.x, HOME_DOOR.y);
+    expect([...seen].some((k) => { const [x, y] = k.split(',').map(Number); return tileAt(MAPS.stillbrook, x, y) === ','; })).toBe(true);
   });
 });
