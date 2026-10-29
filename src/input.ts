@@ -6,10 +6,18 @@ const KEYMAP: Record<string, Button> = {
   ArrowDown: 'down', KeyS: 'down',
   ArrowLeft: 'left', KeyA: 'left',
   ArrowRight: 'right', KeyD: 'right',
-  KeyZ: 'a', Enter: 'a', Space: 'a',
-  KeyX: 'b', Escape: 'b', Backspace: 'b',
+  Enter: 'a', Space: 'a',
+  Escape: 'b', Backspace: 'b',
   ShiftLeft: 'start', ShiftRight: 'start',
 };
+
+// Letter keys go by the printed letter, so they work on QWERTZ and QWERTY alike.
+// Y (and Z) = A to agree, X = B to cancel and, held while walking, to run.
+const LETTERS: Record<string, Button> = { y: 'a', z: 'a', x: 'b' };
+
+function buttonFor(e: KeyboardEvent): Button | undefined {
+  return LETTERS[e.key.toLowerCase()] ?? KEYMAP[e.code];
+}
 
 const held = new Set<Button>();
 const pressed = new Set<Button>();
@@ -31,13 +39,13 @@ function release(b: Button): void {
 
 export function initInput(): void {
   window.addEventListener('keydown', (e) => {
-    const b = KEYMAP[e.code];
+    const b = buttonFor(e);
     if (!b) return;
     e.preventDefault();
     press(b);
   });
   window.addEventListener('keyup', (e) => {
-    const b = KEYMAP[e.code];
+    const b = buttonFor(e);
     if (b) release(b);
   });
   window.addEventListener('blur', () => {

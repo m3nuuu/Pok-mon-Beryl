@@ -15,8 +15,9 @@ This is the **first playable prototype (v0.1)**: a small vertical slice in Beryl
 | Action | Keyboard | Touch |
 |---|---|---|
 | Move | Arrow keys / WASD | D-pad |
-| A (talk, confirm) | Z / Enter / Space | A |
-| B (back) | X / Esc / Backspace | B |
+| A (talk, agree) | Y / Enter / Space | A |
+| B (back, cancel) | X / Esc / Backspace | B |
+| Run | Hold X while moving | Hold B while moving |
 | Menu | Shift | MENU |
 
 ## Run it locally

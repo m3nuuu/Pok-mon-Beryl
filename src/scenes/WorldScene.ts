@@ -13,7 +13,8 @@ import type { UIScene } from './UIScene';
 import { delay, tweenP } from '../ui/widgets';
 
 const T = 16;
-const STEP_MS = 200;
+const WALK_MS = 200;
+const RUN_MS = 110;
 const DELTA: Record<Facing, [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 const OPPOSITE: Record<Facing, Facing> = { up: 'down', down: 'up', left: 'right', right: 'left' };
 
@@ -50,7 +51,8 @@ class Walker {
     this.frame(0);
   }
 
-  async step(scene: Phaser.Scene, dir: Facing) {
+  async step(scene: Phaser.Scene, dir: Facing, running = false) {
+    const ms = running ? RUN_MS : WALK_MS;
     this.face(dir);
     this.moving = true;
     const [dx, dy] = DELTA[dir];
@@ -59,9 +61,9 @@ class Walker {
     this.stepParity ^= 1;
     this.frame(1 + this.stepParity);
     this.sprite.setDepth(Math.max(this.y, this.y - dy) * 10 + 5);
-    scene.time.delayedCall(STEP_MS / 2, () => this.frame(0));
+    scene.time.delayedCall(ms / 2, () => this.frame(0));
     await tweenP(scene, {
-      targets: this.sprite, x: this.x * T + T / 2, y: this.y * T + T, duration: STEP_MS,
+      targets: this.sprite, x: this.x * T + T / 2, y: this.y * T + T, duration: ms,
     });
     this.place();
     this.moving = false;
@@ -197,10 +199,11 @@ export class WorldScene extends Phaser.Scene {
       await this.script(() => this.ui.say("JASPER: Hey, BERYL! Don't go into the tall grass without a POKéMON!"));
       return;
     }
-    await this.player.step(this, dir);
+    // Holding B (X key) runs, from the very start of the game.
+    await this.player.step(this, dir, isHeld('b'));
     game.state.player = { x: this.player.x, y: this.player.y, facing: this.player.facing };
     this.updateGrassOverlay();
-    if (tileAt(this.player.x, this.player.y) === ',' && Math.random() < ENCOUNTER_RATE && !isHeld('b')) {
+    if (tileAt(this.player.x, this.player.y) === ',' && Math.random() < ENCOUNTER_RATE) {
       await this.script(() => this.wildEncounter());
     }
   }
