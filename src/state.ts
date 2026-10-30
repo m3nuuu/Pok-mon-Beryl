@@ -5,6 +5,10 @@ export type Facing = 'down' | 'up' | 'left' | 'right';
 
 export interface GameState {
   party: Pokemon[];
+  /** Caught Pokémon that didn't fit in the party of six. */
+  box: Pokemon[];
+  /** Item id → count. */
+  bag: Record<string, number>;
   badges: number;
   flags: Record<string, boolean>;
   player: { map: MapId; x: number; y: number; facing: Facing };
@@ -19,7 +23,7 @@ export const START_POSITION = { map: 'home' as MapId, x: 2, y: 3, facing: 'down'
 export const HOME_DOOR = { map: 'stillbrook' as MapId, x: 4, y: 8, facing: 'down' as Facing };
 
 export function newGame(): GameState {
-  return { party: [], badges: 0, flags: {}, player: { ...START_POSITION } };
+  return { party: [], box: [], bag: {}, badges: 0, flags: {}, player: { ...START_POSITION } };
 }
 
 /** The single live game state shared by all scenes. */
@@ -50,4 +54,18 @@ export function load(): boolean {
   } catch {
     return false;
   }
+}
+
+export function addItem(id: string, n = 1): void {
+  const bag = game.state.bag;
+  bag[id] = (bag[id] ?? 0) + n;
+}
+
+/** Uses up one of an item; false if there is none. */
+export function takeItem(id: string): boolean {
+  const bag = game.state.bag;
+  if (!bag[id]) return false;
+  bag[id] -= 1;
+  if (bag[id] <= 0) delete bag[id];
+  return true;
 }

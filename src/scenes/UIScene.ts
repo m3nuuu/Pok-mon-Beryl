@@ -28,8 +28,8 @@ export class UIScene extends Phaser.Scene {
     return i === 0;
   }
 
-  async menu(items: string[]): Promise<number> {
-    return choose(this, items, { x: 444, y: 8, w: 272, cancel: -1 });
+  async menu(items: string[], w = 272): Promise<number> {
+    return choose(this, items, { x: SCREEN_W - 4 - w, y: 8, w, cancel: -1 });
   }
 
   async pickStarter(): Promise<string> {

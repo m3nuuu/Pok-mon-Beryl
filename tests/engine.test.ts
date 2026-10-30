@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  calcDamage, calcStats, createPokemon, expForLevel, gainExp, newBattler, rivalStarterFor, wildLevel,
+  calcDamage, calcStats, catchShakes, createPokemon, healBy, expForLevel, gainExp, newBattler, rivalStarterFor, wildLevel,
 } from '../src/battle/engine';
 import { MOVES } from '../src/data/moves';
 import { SPECIES, SPECIES_LIST, STARTERS } from '../src/data/species';
@@ -86,5 +86,38 @@ describe('battle math', () => {
       expect(lv).toBeGreaterThanOrEqual(4);
       expect(lv).toBeLessThanOrEqual(6);
     }
+  });
+});
+
+describe('items', () => {
+  it('catches a weakened common Pokémon far more often than a healthy one', () => {
+    let seed = 1;
+    const rng = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const tries = (hp: (max: number) => number) => {
+      let caught = 0;
+      for (let i = 0; i < 2000; i++) {
+        const p = createPokemon('pipwing', 4);
+        p.hp = hp(calcStats(p).hp);
+        if (catchShakes(p, 1, rng) === 4) caught++;
+      }
+      return caught / 2000;
+    };
+    const full = tries((m) => m), low = tries(() => 1);
+    expect(low).toBeGreaterThan(full);
+    expect(low).toBeGreaterThan(0.6);
+    expect(full).toBeGreaterThan(0.1);
+  });
+
+  it('almost never catches Lethys with a POKé BALL', () => {
+    const p = createPokemon('lethys', 50);
+    expect(catchShakes(p, 1, () => 0.5)).toBeLessThan(4);
+  });
+
+  it('heals up to the missing HP only', () => {
+    const p = createPokemon('pipwing', 5);
+    const max = calcStats(p).hp;
+    p.hp = max - 5;
+    expect(healBy(p, 20)).toBe(5);
+    expect(p.hp).toBe(max);
   });
 });

@@ -16,6 +16,8 @@ export interface Pokemon {
   exp: number;
   hp: number;
   moves: MoveSlot[];
+  /** Index of the move used last, so the move menu opens on it. */
+  lastMove?: number;
 }
 
 export type Stats = BaseStats;
@@ -192,4 +194,27 @@ export function pickEnemyMove(b: Battler, rng: Rng): MoveSlot {
 /** Rival takes the starter with the type advantage over the player's pick. */
 export function rivalStarterFor(playerStarter: string): string {
   return ({ mossfawn: 'cindaroo', newtide: 'mossfawn', cindaroo: 'newtide' } as Record<string, string>)[playerStarter];
+}
+
+/**
+ * Gen III catch check. Returns how many times the ball shakes (0-3),
+ * or 4 when the Pokémon is caught.
+ */
+export function catchShakes(wild: Pokemon, ballBonus: number, rng: Rng): number {
+  const max = calcStats(wild).hp;
+  const rate = SPECIES[wild.species].catchRate ?? 190;
+  const a = Math.floor(((3 * max - 2 * wild.hp) * rate * ballBonus) / (3 * max));
+  if (a >= 255) return 4;
+  const b = Math.floor(1048560 / Math.sqrt(Math.sqrt(16711680 / Math.max(1, a))));
+  let shakes = 0;
+  while (shakes < 4 && Math.floor(rng() * 65536) < b) shakes++;
+  return shakes;
+}
+
+/** How much HP a healing item restores, capped at the missing HP. */
+export function healBy(p: Pokemon, amount: number): number {
+  const missing = calcStats(p).hp - p.hp;
+  const healed = Math.min(missing, amount);
+  p.hp += healed;
+  return healed;
 }

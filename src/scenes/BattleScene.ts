@@ -1,11 +1,12 @@
 import Phaser from 'phaser';
 import {
-  applyStage, calcDamage, calcStats, canEscape, expForLevel, expYield, gainExp, goesFirst,
-  newBattler, pickEnemyMove, type Battler, type MoveSlot, type Pokemon,
+  applyStage, calcDamage, calcStats, canEscape, catchShakes, expForLevel, expYield, gainExp, goesFirst,
+  healBy, newBattler, pickEnemyMove, type Battler, type MoveSlot, type Pokemon,
 } from '../battle/engine';
+import { ITEMS } from '../data/items';
 import { MOVES, type StatKey } from '../data/moves';
 import { SPECIES } from '../data/species';
-import { game } from '../state';
+import { game, takeItem } from '../state';
 import { DialogBox, choose, delay, label, tweenP, SCREEN_H, SCREEN_W } from '../ui/widgets';
 
 export type BattleResult = 'win' | 'lose' | 'run';
@@ -184,9 +185,12 @@ export class BattleScene extends Phaser.Scene {
       if (action === 0) {
         playerMove = await this.chooseMove();
         if (!playerMove) continue;
-      } else if (action === 1 || action === 2) {
-        await say(`${action === 1 ? 'The BAG' : 'Switching POKéMON'} isn't in this prototype yet!`);
-        continue;
+      } else if (action === 1) {
+        const used = await this.openBag();
+        if (used === 'cancel') continue;
+        if (used === 'caught') return this.finish('win');
+      } else if (action === 2) {
+        if (!(await this.switchMenu())) continue;
       } else if (action === 3) {
         if (this.cfg.kind === 'trainer') {
           await say("No! There's no running from a TRAINER battle!");
@@ -216,7 +220,7 @@ export class BattleScene extends Phaser.Scene {
       }
 
       if (this.enemy.mon.hp <= 0) return this.enemyFainted();
-      if (this.player.mon.hp <= 0) return this.playerFainted();
+      if (this.player.mon.hp <= 0 && !(await this.playerFainted())) return;
     }
   }
 
@@ -242,6 +246,7 @@ export class BattleScene extends Phaser.Scene {
     type.setPosition(504, SCREEN_H - 56);
     const idx = await choose(this, moves.map((m) => upper(MOVES[m.id].name)), {
       x: 4, y: SCREEN_H - 124, w: 472, cols: 2, colWidth: 220, rowHeight: 42, size: 16, cancel: -1,
+      start: Math.min(this.player.mon.lastMove ?? 0, moves.length - 1),
       onMove: (i) => {
         const m = MOVES[moves[i].id];
         pp.setText(`PP ${moves[i].pp}/${m.pp}`);
@@ -256,6 +261,7 @@ export class BattleScene extends Phaser.Scene {
       await this.dialog.say("There's no PP left for this move!");
       return null;
     }
+    this.player.mon.lastMove = idx;
     return moves[idx];
   }
 
@@ -358,9 +364,15 @@ export class BattleScene extends Phaser.Scene {
     await this.finish('win');
   }
 
-  private async playerFainted() {
+  /** Returns true when another Pokémon was sent out and the battle goes on. */
+  private async playerFainted(): Promise<boolean> {
     await this.faint(this.playerSprite);
     await this.dialog.say(`${monName(this.player.mon)} fainted!`);
+    const next = game.state.party.find((p) => p.hp > 0);
+    if (next) {
+      await this.sendOut(next);
+      return true;
+    }
     if (this.cfg.kind === 'trainer' && this.cfg.canLose) {
       await this.dialog.say(`BERYL lost to ${this.cfg.trainerName}...`);
     } else {
@@ -368,6 +380,139 @@ export class BattleScene extends Phaser.Scene {
       await this.dialog.say('BERYL whited out!');
     }
     await this.finish('lose');
+    return false;
+  }
+
+  private async sendOut(mon: Pokemon) {
+    this.player = newBattler(mon);
+    for (const o of this.playerBox.objects) o.destroy();
+    this.playerBox = new StatusBox(this, 400, 226, mon, true);
+    this.playerSprite.setTexture(`mon-${mon.species}`).setAlpha(1).setPosition(-200, 384);
+    await tweenP(this, { targets: this.playerSprite, x: 190, duration: 400, ease: 'Quad.easeOut' });
+    await this.dialog.say(`Go! ${monName(mon)}!`, false);
+  }
+
+  /** Small menu above the dialog box, right side. */
+  private menuAbove(items: string[], onMove?: (i: number) => void): Promise<number> {
+    const h = items.length * 42 + 36;
+    return choose(this, items, {
+      x: 364, y: SCREEN_H - 128 - h, w: 352, rowHeight: 42, size: 16, cancel: items.length - 1, onMove,
+    });
+  }
+
+  private async switchMenu(): Promise<boolean> {
+    const party = game.state.party;
+    const items = party.map((p) => `${monName(p)} ${p.hp}/${calcStats(p).hp}`);
+    this.dialog.set('Choose a POKéMON.');
+    const idx = await this.menuAbove([...items, 'CANCEL']);
+    if (idx >= party.length) return false;
+    const mon = party[idx];
+    if (mon === this.player.mon) {
+      await this.dialog.say(`${monName(mon)} is already in battle!`);
+      return false;
+    }
+    if (mon.hp <= 0) {
+      await this.dialog.say(`${monName(mon)} has no energy left to battle!`);
+      return false;
+    }
+    await this.dialog.say(`${monName(this.player.mon)}, come back!`, false);
+    await tweenP(this, { targets: this.playerSprite, x: -200, duration: 300, ease: 'Quad.easeIn' });
+    await this.sendOut(mon);
+    return true;
+  }
+
+  private async openBag(): Promise<'cancel' | 'used' | 'caught'> {
+    const bag = game.state.bag;
+    const ids = Object.keys(bag).filter((id) => ITEMS[id] && bag[id] > 0);
+    if (ids.length === 0) {
+      await this.dialog.say('The BAG is empty.');
+      return 'cancel';
+    }
+    const idx = await this.menuAbove(
+      [...ids.map((id) => `${ITEMS[id].name} x${bag[id]}`), 'CANCEL'],
+      (i) => this.dialog.set(i < ids.length ? ITEMS[ids[i]].desc : 'Close the BAG.'),
+    );
+    if (idx >= ids.length) return 'cancel';
+    const item = ITEMS[ids[idx]];
+
+    if (item.kind === 'heal') {
+      const mon = this.player.mon;
+      if (mon.hp >= calcStats(mon).hp) {
+        await this.dialog.say("It won't have any effect.");
+        return 'cancel';
+      }
+      takeItem(item.id);
+      await this.dialog.say(`BERYL used ${item.name}!`, false);
+      const healed = healBy(mon, item.power);
+      await this.playerBox.animateHp(mon.hp);
+      await this.dialog.say(`${monName(mon)}'s HP was restored by ${healed} points.`);
+      return 'used';
+    }
+
+    if (this.cfg.kind === 'trainer') {
+      await this.dialog.say("The TRAINER blocked the BALL! You can't catch someone else's POKéMON!");
+      return 'cancel';
+    }
+    takeItem(item.id);
+    await this.dialog.say(`BERYL used ${item.name}!`, false);
+    const shakes = catchShakes(this.enemy.mon, item.power, rng);
+    if (await this.throwBall(Math.min(shakes, 3), shakes === 4)) {
+      await this.dialog.say(`Gotcha! ${monName(this.enemy.mon)} was caught!`);
+      const caught = this.enemy.mon;
+      delete caught.lastMove;
+      if (game.state.party.length < 6) {
+        game.state.party.push(caught);
+      } else {
+        game.state.box.push(caught);
+        await this.dialog.say(`${monName(caught)} was sent to the BOX.`);
+      }
+      return 'caught';
+    }
+    await this.dialog.say([
+      'Oh no! It broke free!',
+      'Aww! It looked like it was caught!',
+      'Argh! So close!',
+      'Shoot! It almost stayed in!',
+    ][Math.min(shakes, 3)]);
+    return 'used';
+  }
+
+  /** Throws a ball at the wild Pokémon. Resolves true if it stays shut. */
+  private async throwBall(shakes: number, caught: boolean): Promise<boolean> {
+    const ball = this.add.container(150, 330).setDepth(900);
+    const g = this.add.graphics();
+    g.fillStyle(0x303030, 1).fillCircle(0, 0, 14);
+    g.fillStyle(0xf8f8f8, 1).fillCircle(0, 0, 12);
+    g.fillStyle(0xe83838, 1).slice(0, 0, 12, Math.PI, 2 * Math.PI, false).fillPath();
+    g.fillStyle(0x303030, 1).fillRect(-12, -1, 24, 3).fillCircle(0, 0, 5);
+    g.fillStyle(0xf8f8f8, 1).fillCircle(0, 0, 3);
+    ball.add(g);
+    const tx = 520, ty = 130;
+    const arc = { t: 0 };
+    await tweenP(this, {
+      targets: arc, t: 1, duration: 600,
+      onUpdate: () => {
+        ball.setPosition(150 + (tx - 150) * arc.t, 330 + (ty - 330) * arc.t - Math.sin(arc.t * Math.PI) * 120);
+        ball.setRotation(arc.t * 12);
+      },
+    });
+    ball.setRotation(0);
+    await tweenP(this, { targets: this.enemySprite, scale: 0, alpha: 0, y: ty, duration: 300 });
+    await tweenP(this, { targets: ball, y: 200, duration: 350, ease: 'Bounce.easeOut' });
+    for (let i = 0; i < shakes; i++) {
+      await delay(this, 350);
+      await tweenP(this, { targets: ball, rotation: 0.4, duration: 120, yoyo: true });
+      await tweenP(this, { targets: ball, rotation: -0.4, duration: 120, yoyo: true });
+    }
+    await delay(this, 400);
+    if (caught) {
+      ball.each((o: Phaser.GameObjects.GameObject) => (o as Phaser.GameObjects.Graphics).setAlpha(0.7));
+      return true;
+    }
+    ball.destroy();
+    this.enemySprite.setY(214);
+    await tweenP(this, { targets: this.enemySprite, scale: 3, alpha: 1, duration: 250 });
+    return false;
   }
 
   private async finish(result: BattleResult) {

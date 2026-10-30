@@ -1,7 +1,8 @@
 import { createPokemon, heal, movesKnownAt, rivalStarterFor, type Pokemon } from '../battle/engine';
 import { MOVES } from '../data/moves';
 import { SPECIES } from '../data/species';
-import { game, save, HOME_DOOR } from '../state';
+import { MAPS, tileAt } from '../data/maps';
+import { addItem, game, save, HOME_DOOR, type Facing } from '../state';
 import type { ScriptApi } from './api';
 
 // The prologue, scene by scene. Each scene is gated by story flags, so a
@@ -16,7 +17,19 @@ export async function onEnterMap(api: ScriptApi): Promise<void> {
   if (api.mapId === 'home' && !f.woke) return morning(api);
   if (api.mapId === 'home' && f.metJasper && !f.gotStarter) return spruceVisit(api);
   if (api.mapId === 'stillbrook' && f.gotStarter && !f.taskGiven) return firstBattle(api);
-  if (f.taskGiven && !f.prologueDone) return evening(api);
+}
+
+/** Runs after every step the player takes. Returns true if a scene played. */
+export async function onStep(api: ScriptApi): Promise<boolean> {
+  const f = flags();
+  if (api.mapId === 'stillbrook' && f.taskGiven && !f.prologueDone) {
+    const spot = riverSpot(api);
+    if (spot) {
+      await lethysScene(api, spot);
+      return true;
+    }
+  }
+  return false;
 }
 
 export async function onStepGrassWithoutPokemon(api: ScriptApi): Promise<void> {
@@ -91,19 +104,19 @@ export async function onTalk(api: ScriptApi, id: string): Promise<boolean> {
 
     case 'guard':
       return say(
-        'DAM GUARD: Sorry, kid. Staff only beyond this door.',
+        'BRAM: Sorry, kid. Staff only beyond this door.',
         'Your mum and dad are hard at work in there today.',
       );
 
     case 'neighbor':
       if (f.prologueDone) {
         return say(
-          'NEIGHBOR: Someone saw something big in the river last night!',
+          'HAZEL: Greta says she saw something huge in the river today!',
           'A water serpent, they said. Just like in the old stories...',
         );
       }
       return say(
-        'NEIGHBOR: Have you heard? People keep seeing ghost POKéMON by the river at night.',
+        'HAZEL: Have you heard? People keep seeing ghost POKéMON by the river at night.',
         "My grandmother said the river wasn't always this quiet...",
       );
 
@@ -114,11 +127,14 @@ export async function onTalk(api: ScriptApi, id: string): Promise<boolean> {
     case 'ferry':
       if (f.prologueDone) {
         return say(
-          'FERRY KEEPER: Did you sleep well, BERYL?',
-          "Don't tell anyone, but I've only seen LETHYS twice in my life. Last night was the second time.",
+          "GRETA: I still can't believe it. LETHYS, in broad daylight!",
+          "GRETA: I've only seen it twice in my life. Today was the second time.",
         );
       }
-      return say('FERRY KEEPER: The river is calm tonight.');
+      return say(
+        "GRETA: I'm the ferry keeper. The LETHYS is too wide to swim, so I take people across.",
+        'GRETA: Well, I did, before the bridge was built. Now I mostly watch the water.',
+      );
   }
   return false;
 }
@@ -269,66 +285,81 @@ async function firstBattle(api: ScriptApi) {
   await api.say(
     'GRANDMA: My, my. Our BERYL, off on a journey...',
     'GRANDMA: The river remembers everything. Listen to it.',
-    'PROF. SPRUCE: Take today to get to know your partner. ROUTE 1 will still be there tomorrow.',
   );
+  api.faceBeryl('spruce');
+  await api.say(
+    'PROF. SPRUCE: Oh, and you will need these. Catching POKéMON is the best way to learn about them.',
+    'BERYL received 5 POKé BALLS!',
+    'BERYL received a POTION!',
+    'PROF. SPRUCE: Your journey follows the LETHYS, so why not start by saying hello to the river?',
+  );
+  addItem('pokeball', 5);
+  addItem('potion', 1);
   f.hasDex = true;
   f.taskGiven = true;
   api.refresh();
-  await evening(api);
+  save();
 }
 
-async function evening(api: ScriptApi) {
+const STEP: Record<Facing, [number, number]> = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
+
+/** If Beryl stands right at the river, the river tile a few steps out where LETHYS can rise. */
+function riverSpot(api: ScriptApi): { x: number; y: number } | null {
+  const map = MAPS[api.mapId];
+  const p = api.playerPos();
+  const dirs: Facing[] = [p.facing, 'right', 'left', 'up', 'down'];
+  for (const d of dirs) {
+    const [dx, dy] = STEP[d];
+    if (tileAt(map, p.x + dx, p.y + dy) !== '~') continue;
+    let n = 1;
+    while (n < 4 && tileAt(map, p.x + dx * (n + 1), p.y + dy * (n + 1)) === '~') n++;
+    return { x: p.x + dx * n, y: p.y + dy * n };
+  }
+  return null;
+}
+
+async function lethysScene(api: ScriptApi, spot: { x: number; y: number }) {
   const f = flags();
-  await api.say('That evening...');
-  await api.warp('stillbrook', 21, 19, 'right', () => api.setEvening(true));
-  api.face('ferry', 'right');
-  await api.say(
-    'FERRY KEEPER: Evening, BERYL. Come to watch the river with me?',
-    'FERRY KEEPER: Off on a journey tomorrow, I heard. The whole town is talking about it.',
-  );
-  await api.wait(500);
-  await api.lethysAppears(23, 18);
+  await api.say('The water is strangely still...');
+  await api.wait(400);
+  await api.lethysAppears(spot.x, spot.y);
   await api.emote('player', 'exclaim');
+  const p = api.playerPos();
+  if (Math.abs(p.x - 20) + Math.abs(p.y - 20) > 3) await api.say('Someone comes running from the ferry dock!');
   await api.say(
-    'FERRY KEEPER: Did you see that?! That was LETHYS, the spirit of the river!',
-    'FERRY KEEPER: My grandmother told me it only comes when the region needs its hero.',
-    'FERRY KEEPER: ...But everything seems fine, doesn\'t it?',
-  );
-  await api.fadeOut(600);
-  await api.say('The next morning...');
-  f.prologueDone = true;
-  await api.warp(HOME_DOOR.map, HOME_DOOR.x, HOME_DOOR.y, HOME_DOOR.facing, () => api.setEvening(false));
-  await api.say(
-    'GRANDMA (from the door): Have a good day, dear! Come home whenever your POKéMON need a rest.',
+    'GRETA: BERYL! Did you see that?! That was LETHYS, the spirit of the river!',
+    'GRETA: In broad daylight... My grandmother told me it only shows itself when the region needs its hero.',
+    "GRETA: ...But everything seems fine, doesn't it?",
     'END OF PROLOGUE. Thanks for playing! ROUTE 1 and WEIRHAVEN come in the next chapter.',
   );
+  f.prologueDone = true;
   save();
 }
 
 async function fisherman(api: ScriptApi) {
   const s = game.state;
   if (s.party.length === 0) {
-    await api.say("FISHERMAN: The fish are biting today! Come back with a POKéMON and I'll show you my catch.");
+    await api.say("OTTO: The fish are biting today! Come back with a POKéMON and I'll show you my catch.");
     return;
   }
   if (s.flags.fisherBattle) {
     await api.say(
-      "FISHERMAN: MURKFIN don't look like much. But my grandpa swore...",
+      "OTTO: MURKFIN don't look like much. But my grandpa swore...",
       'the ones that grow up in the strong current below the dam turn into something else entirely!',
     );
     return;
   }
-  await api.say('FISHERMAN: The LETHYS ran wild before the dam, my grandpa said. Look what I just fished up!');
-  if (!(await api.yesNo('FISHERMAN: Want to battle my MURKFIN?'))) {
-    await api.say('FISHERMAN: Suit yourself!');
+  await api.say('OTTO: The LETHYS ran wild before the dam, my grandpa said. Look what I just fished up!');
+  if (!(await api.yesNo('OTTO: Want to battle my MURKFIN?'))) {
+    await api.say('OTTO: Suit yourself!');
     return;
   }
-  const result = await api.battle({ kind: 'trainer', trainerName: 'FISHERMAN', enemy: createPokemon('murkfin', 5), bg: 'water' });
+  const result = await api.battle({ kind: 'trainer', trainerName: 'FISHER OTTO', enemy: createPokemon('murkfin', 5), bg: 'water' });
   if (result === 'lose') {
     await api.whiteOut();
     return;
   }
   s.flags.fisherBattle = true;
-  await api.say('FISHERMAN: Ha! Fair and square. MURKFIN is better at splashing than battling.');
+  await api.say('OTTO: Ha! Fair and square. MURKFIN is better at splashing than battling.');
   save();
 }

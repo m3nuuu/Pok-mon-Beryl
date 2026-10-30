@@ -6,6 +6,7 @@ import type { Facing } from '../state';
 /** What story scripts can do. Implemented by the WorldScene; every call resolves when it has finished on screen. */
 export interface ScriptApi {
   readonly mapId: MapId;
+  playerPos(): { x: number; y: number; facing: Facing };
   say(...lines: string[]): Promise<void>;
   yesNo(question: string): Promise<boolean>;
   pickStarter(): Promise<string>;
@@ -22,7 +23,6 @@ export interface ScriptApi {
   warp(map: MapId, x: number, y: number, facing: Facing, whileDark?: () => void): Promise<void>;
   fadeOut(ms?: number): Promise<void>;
   fadeIn(ms?: number): Promise<void>;
-  setEvening(on: boolean): void;
   /** Lethys rises from the river at a tile, lingers, and sinks back. */
   lethysAppears(x: number, y: number): Promise<void>;
   wait(ms: number): Promise<void>;

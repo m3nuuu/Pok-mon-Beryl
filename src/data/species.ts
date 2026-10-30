@@ -21,58 +21,60 @@ export interface SpeciesData {
   learnset: [number, string][];
   sprite: string;
   evolvesTo?: { species: string; level: number };
+  /** Gen III catch rate (3 to 255). Defaults to 190, a common wild Pokémon. */
+  catchRate?: number;
 }
 
 // Names and types follow the Pokédex doc. Base stats are first-pass numbers for the prototype.
 const list: SpeciesData[] = [
   {
-    id: 'mossfawn', dex: '001', name: 'Mossfawn', types: ['Grass'],
+    id: 'mossfawn', dex: '001', name: 'Mossfawn', types: ['Grass'], catchRate: 45,
     base: { hp: 45, atk: 58, def: 50, spa: 42, spd: 52, spe: 55 }, expYield: 62,
     learnset: [[1, 'tackle'], [1, 'growl'], [5, 'leafage'], [9, 'rockthrow']],
     sprite: '001.png', evolvesTo: { species: 'mossbuck', level: 16 },
   },
   {
-    id: 'mossbuck', dex: '002', name: 'Mossbuck', types: ['Grass'],
+    id: 'mossbuck', dex: '002', name: 'Mossbuck', types: ['Grass'], catchRate: 45,
     base: { hp: 60, atk: 75, def: 65, spa: 55, spd: 65, spe: 65 }, expYield: 142,
     learnset: [[1, 'tackle'], [1, 'growl'], [1, 'leafage'], [1, 'rockthrow']],
     sprite: '002.png', evolvesTo: { species: 'mosshart', level: 36 },
   },
   {
-    id: 'mosshart', dex: '003', name: 'Mosshart', types: ['Grass', 'Dark'],
+    id: 'mosshart', dex: '003', name: 'Mosshart', types: ['Grass', 'Dark'], catchRate: 45,
     base: { hp: 80, atk: 105, def: 80, spa: 70, spd: 80, spe: 85 }, expYield: 236,
     learnset: [[1, 'tackle'], [1, 'leafage'], [1, 'rockthrow']], sprite: '003.png',
   },
   {
-    id: 'newtide', dex: '004', name: 'Newtide', types: ['Water'],
+    id: 'newtide', dex: '004', name: 'Newtide', types: ['Water'], catchRate: 45,
     base: { hp: 50, atk: 48, def: 52, spa: 54, spd: 50, spe: 48 }, expYield: 62,
     learnset: [[1, 'tackle'], [1, 'tailwhip'], [5, 'watergun'], [9, 'quickattack']],
     sprite: '004.png', evolvesTo: { species: 'tidemander', level: 16 },
   },
   {
-    id: 'tidemander', dex: '005', name: 'Tidemander', types: ['Water'],
+    id: 'tidemander', dex: '005', name: 'Tidemander', types: ['Water'], catchRate: 45,
     base: { hp: 65, atk: 62, def: 68, spa: 72, spd: 65, spe: 63 }, expYield: 142,
     learnset: [[1, 'tackle'], [1, 'tailwhip'], [1, 'watergun']],
     sprite: '005.png', evolvesTo: { species: 'tidrake', level: 36 },
   },
   {
-    id: 'tidrake', dex: '006', name: 'Tidrake', types: ['Water', 'Flying'],
+    id: 'tidrake', dex: '006', name: 'Tidrake', types: ['Water', 'Flying'], catchRate: 45,
     base: { hp: 82, atk: 80, def: 80, spa: 98, spd: 85, spe: 95 }, expYield: 236,
     learnset: [[1, 'watergun'], [1, 'gust']], sprite: '006.png',
   },
   {
-    id: 'cindaroo', dex: '007', name: 'Cindaroo', types: ['Fire'],
+    id: 'cindaroo', dex: '007', name: 'Cindaroo', types: ['Fire'], catchRate: 45,
     base: { hp: 44, atk: 56, def: 43, spa: 56, spd: 46, spe: 60 }, expYield: 62,
     learnset: [[1, 'scratch'], [1, 'growl'], [5, 'ember'], [9, 'quickattack']],
     sprite: '007.png', evolvesTo: { species: 'marrowroo', level: 16 },
   },
   {
-    id: 'marrowroo', dex: '008', name: 'Marrowroo', types: ['Fire'],
+    id: 'marrowroo', dex: '008', name: 'Marrowroo', types: ['Fire'], catchRate: 45,
     base: { hp: 58, atk: 72, def: 58, spa: 72, spd: 60, spe: 78 }, expYield: 142,
     learnset: [[1, 'scratch'], [1, 'growl'], [1, 'ember']],
     sprite: '008.png', evolvesTo: { species: 'spectaroo', level: 36 },
   },
   {
-    id: 'spectaroo', dex: '009', name: 'Spectaroo', types: ['Fire', 'Ghost'],
+    id: 'spectaroo', dex: '009', name: 'Spectaroo', types: ['Fire', 'Ghost'], catchRate: 45,
     base: { hp: 75, atk: 95, def: 72, spa: 95, spd: 80, spe: 100 }, expYield: 236,
     learnset: [[1, 'ember'], [1, 'astonish']], sprite: '009.png',
   },
@@ -104,7 +106,7 @@ const list: SpeciesData[] = [
     learnset: [[1, 'peck'], [1, 'quickattack']], sprite: '014.png',
   },
   {
-    id: 'lethys', dex: 'L01', name: 'Lethys', types: ['Water', 'Ghost'],
+    id: 'lethys', dex: 'L01', name: 'Lethys', types: ['Water', 'Ghost'], catchRate: 3,
     base: { hp: 105, atk: 80, def: 95, spa: 120, spd: 110, spe: 90 }, expYield: 300,
     learnset: [[1, 'watergun'], [1, 'astonish']], sprite: 'lethys.png',
   },

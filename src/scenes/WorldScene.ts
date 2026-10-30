@@ -1,13 +1,14 @@
 import Phaser from 'phaser';
 import { DIR_FRAMES, tableTexture } from '../art/procedural';
-import { calcStats, createPokemon, heal, wildLevel } from '../battle/engine';
+import { calcStats, createPokemon, heal, healBy, wildLevel } from '../battle/engine';
+import { ITEMS } from '../data/items';
 import { MAPS, isSolidTile, tileAt, type MapDef, type MapId, type NpcDef } from '../data/maps';
 import { MOVES } from '../data/moves';
 import { SPECIES } from '../data/species';
 import { heldDirection, isHeld, justPressed } from '../input';
-import { game, save, HOME_DOOR, type Facing } from '../state';
+import { game, save, takeItem, HOME_DOOR, type Facing } from '../state';
 import type { ScriptApi } from '../story/api';
-import { onEnterMap, onStepGrassWithoutPokemon, onTalk } from '../story/story';
+import { onEnterMap, onStep, onStepGrassWithoutPokemon, onTalk } from '../story/story';
 import { delay, tweenP } from '../ui/widgets';
 import type { BattleConfig, BattleResult } from './BattleScene';
 import type { UIScene } from './UIScene';
@@ -91,7 +92,6 @@ export class WorldScene extends Phaser.Scene implements ScriptApi {
   private mapObjects: Phaser.GameObjects.GameObject[] = [];
   private grassOverlay!: Phaser.GameObjects.Image;
   private animated: { img: Phaser.GameObjects.Image; base: string }[] = [];
-  private evening!: Phaser.GameObjects.Rectangle;
   private busy = false;
   private turnUntil = 0;
   private ui!: UIScene;
@@ -109,8 +109,6 @@ export class WorldScene extends Phaser.Scene implements ScriptApi {
     this.scene.launch('ui');
     this.ui = this.scene.get('ui') as UIScene;
     this.cameras.main.setBackgroundColor('#000000');
-    this.evening = this.add.rectangle(0, 0, 4000, 4000, 0x1c2860, 0.42).setOrigin(0).setDepth(100000);
-    this.evening.setBlendMode(Phaser.BlendModes.MULTIPLY).setVisible(false);
 
     let frame = 0;
     this.time.addEvent({
@@ -299,6 +297,11 @@ export class WorldScene extends Phaser.Scene implements ScriptApi {
       });
       return;
     }
+    let scene = false;
+    await this.script(async () => {
+      scene = await onStep(this);
+    });
+    if (scene) return;
     if (this.map.encounters && tileAt(this.map, this.player.x, this.player.y) === ',' && Math.random() < ENCOUNTER_RATE) {
       await this.script(() => this.wildEncounter());
     }
@@ -330,7 +333,7 @@ export class WorldScene extends Phaser.Scene implements ScriptApi {
   }
 
   private async startMenu() {
-    const choice = await this.ui.menu(['POKéMON', 'SAVE', 'EXIT']);
+    const choice = await this.ui.menu(['POKéMON', 'BAG', 'SAVE', 'EXIT']);
     if (choice === 0) {
       if (game.state.party.length === 0) return this.say("You don't have any POKéMON yet.");
       for (const p of game.state.party) {
@@ -342,9 +345,30 @@ export class WorldScene extends Phaser.Scene implements ScriptApi {
         );
       }
     } else if (choice === 1) {
+      await this.bag();
+    } else if (choice === 2) {
       save();
       await this.say('BERYL saved the game.');
     }
+  }
+
+  private async bag() {
+    const bag = game.state.bag;
+    const ids = Object.keys(bag).filter((id) => ITEMS[id] && bag[id] > 0);
+    if (ids.length === 0) return this.say('The BAG is empty.');
+    const idx = await this.ui.menu([...ids.map((id) => `${ITEMS[id].name} x${bag[id]}`), 'CANCEL'], 420);
+    if (idx < 0 || idx >= ids.length) return;
+    const item = ITEMS[ids[idx]];
+    if (item.kind !== 'heal') return this.say(`${item.desc} You can only use it in battle.`);
+    const party = game.state.party;
+    if (party.length === 0) return this.say("You don't have any POKéMON yet.");
+    const who = await this.ui.menu([...party.map((p) => `${SPECIES[p.species].name.toUpperCase()} ${p.hp}/${calcStats(p).hp}`), 'CANCEL'], 520);
+    if (who < 0 || who >= party.length) return;
+    const mon = party[who];
+    if (mon.hp <= 0 || mon.hp >= calcStats(mon).hp) return this.say("It won't have any effect.");
+    takeItem(item.id);
+    const healed = healBy(mon, item.power);
+    await this.say(`${SPECIES[mon.species].name.toUpperCase()}'s HP was restored by ${healed} points.`);
   }
 
   // --- ScriptApi --------------------------------------------------------------------
@@ -443,8 +467,8 @@ export class WorldScene extends Phaser.Scene implements ScriptApi {
     });
   }
 
-  setEvening(on: boolean) {
-    this.evening.setVisible(on);
+  playerPos() {
+    return { x: this.player.x, y: this.player.y, facing: this.player.facing };
   }
 
   async lethysAppears(x: number, y: number) {
