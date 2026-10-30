@@ -1,10 +1,10 @@
 import type { Facing } from '../state';
 
 export type Flags = Record<string, boolean>;
-export type MapId = 'stillbrook' | 'home' | 'jasperHome' | 'pension';
+export type MapId = 'stillbrook' | 'home' | 'jasperHome';
 
 export interface Building {
-  id: 'home' | 'jasper' | 'gym' | 'pension';
+  id: 'home' | 'jasper' | 'gym' | 'neighbor';
   x: number;
   y: number;
   w: number;
@@ -106,12 +106,11 @@ const stillbrook: MapDef = {
     { id: 'home', x: 2, y: 4, w: 5, h: 4, door: { x: 4, y: 7 } },
     { id: 'jasper', x: 12, y: 4, w: 5, h: 4, door: { x: 14, y: 7 } },
     { id: 'gym', x: 3, y: 14, w: 7, h: 5, door: { x: 6, y: 18 } },
-    { id: 'pension', x: 12, y: 12, w: 6, h: 4, door: { x: 14, y: 15 } },
+    { id: 'neighbor', x: 12, y: 12, w: 6, h: 4, door: { x: 14, y: 15 } },
   ],
   warps: [
     { x: 4, y: 7, to: 'home', tx: 5, ty: 7, facing: 'up' },
     { x: 14, y: 7, to: 'jasperHome', tx: 4, ty: 5, facing: 'up' },
-    { x: 14, y: 15, to: 'pension', tx: 5, ty: 7, facing: 'up' },
   ],
   npcs: [
     { id: 'jasper', name: 'JASPER', x: 4, y: 9, facing: 'up', look: 'jasper', when: between('gotStarter', 'taskGiven') },
@@ -127,7 +126,8 @@ const stillbrook: MapDef = {
     '11,9': ['STILLBROOK', 'Where the Lethys leaves the dam.'],
     '11,4': ['MIRRORMERE DAM', 'Staff entrance ahead. No unauthorized visitors.'],
     '10,18': ['STILLBROOK GYM', 'Type: Fighting. The doors are locked today.'],
-    '18,15': ['STILLBROOK POKéMON PENSION', 'We look after your POKéMON with love!'],
+    '18,15': ['STILLBROOK GARDENS', 'Please keep POKéMON off the flower beds!'],
+    '14,15': ["The door is locked. Nobody seems to be home."],
     '10,22': ['ROUTE 1', 'South to Lanterncross. The road opens in the next chapter!'],
     '10,2': ["It's locked. A plate reads: MIRRORMERE DAM - STAFF ONLY."],
     '6,18': ["The GYM is locked. A note says: 'Training at the river. Back at dusk!'"],
@@ -158,8 +158,8 @@ const home: MapDef = {
     { id: 'dad', name: 'DAD', x: 7, y: 5, facing: 'left', look: 'dad', when: before('parentsLeft') },
     { id: 'grandma', name: 'GRANDMA', x: 8, y: 3, facing: 'down', look: 'grandma', when: (f) => !(f.gotStarter && !f.taskGiven) },
     { id: 'homemon', name: 'FAMILY POKéMON', x: 3, y: 6, facing: 'down', look: 'homemon', when: (f) => !f.parentsLeft || !!f.gotStarter },
-    { id: 'spruce', name: 'PROF. SPRUCE', x: 7, y: 4, facing: 'left', look: 'spruce', when: between('metJasperMom', 'gotStarter') },
-    { id: 'jasper', name: 'JASPER', x: 4, y: 6, facing: 'right', look: 'jasper', when: between('metJasperMom', 'gotStarter') },
+    { id: 'spruce', name: 'PROF. SPRUCE', x: 7, y: 4, facing: 'left', look: 'spruce', when: between('metJasper', 'gotStarter') },
+    { id: 'jasper', name: 'JASPER', x: 4, y: 6, facing: 'right', look: 'jasper', when: between('metJasper', 'gotStarter') },
   ],
   inspect: {
     '5,1': ['A soft toy of LETHYS, the river serpent. You have had it since you were tiny.'],
@@ -190,7 +190,8 @@ const jasperHome: MapDef = {
   warps: [{ x: 4, y: 6, to: 'stillbrook', tx: 14, ty: 8, facing: 'down' }],
   npcs: [
     { id: 'jasperDad', name: "JASPER'S DAD", x: 2, y: 2, facing: 'down', look: 'jasperDad' },
-    { id: 'jasper', name: 'JASPER', x: 6, y: 4, facing: 'left', look: 'jasper', when: before('metJasperDad') },
+    { id: 'jasperMom', name: "JASPER'S MUM", x: 6, y: 2, facing: 'down', look: 'jasperMom' },
+    { id: 'jasper', name: 'JASPER', x: 6, y: 4, facing: 'left', look: 'jasper', when: before('metJasper') },
   ],
   inspect: {
     '5,1': ['A shelf full of FIGHTING-type training manuals.'],
@@ -199,36 +200,4 @@ const jasperHome: MapDef = {
   },
 };
 
-const pension: MapDef = {
-  id: 'pension',
-  name: 'POKéMON PENSION',
-  kind: 'indoor',
-  rows: [
-    '############',
-    '#WwWkkkkWwW#',
-    '#__________#',
-    '#oooo__oooo#',
-    '#o__o__o__o#',
-    '#o__o__o__o#',
-    '#oooo__oooo#',
-    '#p________p#',
-    '#____X_____#',
-    '############',
-  ],
-  buildings: [],
-  warps: [{ x: 5, y: 8, to: 'stillbrook', tx: 14, ty: 16, facing: 'down' }],
-  npcs: [
-    { id: 'jasperMom', name: "JASPER'S MUM", x: 5, y: 2, facing: 'down', look: 'jasperMom' },
-    { id: 'jasper', name: 'JASPER', x: 6, y: 3, facing: 'up', look: 'jasper', when: between('metJasperDad', 'metJasperMom') },
-    { id: 'penPipwing', name: 'PIPWING', x: 2, y: 4, facing: 'down', look: 'mon-pipwing' },
-    { id: 'penMurkfin', name: 'MURKFIN', x: 9, y: 5, facing: 'down', look: 'mon-murkfin' },
-  ],
-  inspect: {
-    '2,3': ['PIPWING is dozing in the sun.'],
-    '4,4': ['PIPWING is dozing in the sun.'],
-    '9,3': ['MURKFIN splashes around in its water bowl.'],
-    '7,5': ['MURKFIN splashes around in its water bowl.'],
-  },
-};
-
-export const MAPS: Record<MapId, MapDef> = { stillbrook, home, jasperHome, pension };
+export const MAPS: Record<MapId, MapDef> = { stillbrook, home, jasperHome };

@@ -6,7 +6,7 @@ import type { ScriptApi } from './api';
 
 // The prologue, scene by scene. Each scene is gated by story flags, so a
 // reloaded save picks up at the right point:
-//   woke → parentsLeft → metJasperDad → metJasperMom → gotStarter → taskGiven → prologueDone
+//   woke → parentsLeft → metJasper → gotStarter → taskGiven → prologueDone
 
 const flags = () => game.state.flags;
 const nameOf = (p: Pokemon) => SPECIES[p.species].name.toUpperCase();
@@ -14,7 +14,7 @@ const nameOf = (p: Pokemon) => SPECIES[p.species].name.toUpperCase();
 export async function onEnterMap(api: ScriptApi): Promise<void> {
   const f = flags();
   if (api.mapId === 'home' && !f.woke) return morning(api);
-  if (api.mapId === 'home' && f.metJasperMom && !f.gotStarter) return spruceVisit(api);
+  if (api.mapId === 'home' && f.metJasper && !f.gotStarter) return spruceVisit(api);
   if (api.mapId === 'stillbrook' && f.gotStarter && !f.taskGiven) return firstBattle(api);
   if (f.taskGiven && !f.prologueDone) return evening(api);
 }
@@ -60,23 +60,21 @@ export async function onTalk(api: ScriptApi, id: string): Promise<boolean> {
       return say('Your family POKéMON nuzzles you happily.');
 
     case 'jasperDad':
-      if (!f.metJasperDad) return meetJasperDad(api).then(() => true);
+      if (!f.metJasper) return meetJasperFamily(api).then(() => true);
       return say(
         "JASPER'S DAD: I train at the STILLBROOK GYM. FIGHTING-type POKéMON, all the way!",
         'The GYM opens again once the season starts. Come by when you have a team.',
       );
 
     case 'jasperMom':
-      if (f.metJasperDad && !f.metJasperMom) return meetJasperMom(api).then(() => true);
-      if (!f.metJasperMom) return say("JASPER'S MUM: Hello, BERYL! JASPER is still at home, I think.");
+      if (!f.metJasper) return meetJasperFamily(api).then(() => true);
       return say(
-        "JASPER'S MUM: We look after POKéMON while their trainers travel.",
-        "Come back once you've been on the road a while. I might have something useful for you.",
+        "JASPER'S MUM: I work at a POKéMON PENSION further down the river.",
+        "If you pass by on your journey, come and say hello. I might have something useful for you.",
       );
 
     case 'jasper':
-      if (api.mapId === 'jasperHome') return meetJasperDad(api).then(() => true);
-      if (api.mapId === 'pension') return meetJasperMom(api).then(() => true);
+      if (api.mapId === 'jasperHome') return meetJasperFamily(api).then(() => true);
       if (!has) return say('JASPER: Come on, BERYL! The professor is waiting!');
       return say(
         f.rivalWon
@@ -121,11 +119,6 @@ export async function onTalk(api: ScriptApi, id: string): Promise<boolean> {
         );
       }
       return say('FERRY KEEPER: The river is calm tonight.');
-
-    case 'penPipwing':
-      return say('PIPWING is dozing in the sun.');
-    case 'penMurkfin':
-      return say('MURKFIN splashes around in its water bowl.');
   }
   return false;
 }
@@ -170,7 +163,7 @@ async function morning(api: ScriptApi) {
   save();
 }
 
-async function meetJasperDad(api: ScriptApi) {
+async function meetJasperFamily(api: ScriptApi) {
   const f = flags();
   api.faceBeryl('jasperDad');
   await api.say(
@@ -178,33 +171,22 @@ async function meetJasperDad(api: ScriptApi) {
     "JASPER'S DAD: I train at the STILLBROOK GYM. FIGHTING type, through and through!",
     "JASPER'S DAD: Maybe one day you two will battle me there. Ha ha!",
   );
-  api.faceBeryl('jasper');
-  await api.say(
-    'JASPER: BERYL! Finally!',
-    "JASPER: Let's go see my mum at the POKéMON PENSION. She's got new POKéMON there!",
-    "JASPER: Race you! It's the green roof across the bridge path!",
-  );
-  await api.fadeOut(200);
-  f.metJasperDad = true;
-  api.refresh();
-  await api.fadeIn(200);
-}
-
-async function meetJasperMom(api: ScriptApi) {
-  const f = flags();
   api.faceBeryl('jasperMom');
   await api.say(
-    "JASPER'S MUM: Hello, BERYL! And your family's little one too. Welcome to the PENSION!",
-    "JASPER'S MUM: That PIPWING and MURKFIN are staying with us while their trainers travel.",
+    "JASPER'S MUM: Hello, BERYL! And your family's little one too.",
+    "JASPER'S MUM: I'm only home for a few days. I work at a POKéMON PENSION further down the river.",
+    "JASPER'S MUM: We look after other trainers' POKéMON there while they travel.",
   );
+  api.faceBeryl('jasper');
+  await api.say('JASPER: BERYL! Finally! Look, look, out the window!');
   await api.emote('jasper', 'exclaim');
   await api.say(
-    "JASPER: Mum! Who was that old man walking up to BERYL's house?",
-    "JASPER'S MUM: Oh, that was PROF. SPRUCE! He's having tea with your grandma, BERYL.",
+    "JASPER: Some old man in a lab coat just walked into your house!",
+    "JASPER'S MUM: Oh, that's PROF. SPRUCE! He's having tea with your grandma, BERYL.",
     'JASPER: The POKéMON professor?! Come on, BERYL, hurry!',
   );
   await api.fadeOut(200);
-  f.metJasperMom = true;
+  f.metJasper = true;
   api.refresh();
   await api.fadeIn(200);
 }

@@ -163,7 +163,7 @@ const ROOFS: Record<Building['id'], [string, string]> = {
   home: ['#d05848', '#983830'],
   jasper: ['#4878c8', '#30508c'],
   gym: ['#7c8898', '#505868'],
-  pension: ['#58a858', '#387838'],
+  neighbor: ['#58a858', '#387838'],
 };
 
 function building(c: Ctx, b: Building) {

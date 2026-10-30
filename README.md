@@ -5,7 +5,7 @@ A free, non-commercial, Gen-3-style Pokémon fan game set in the region of **Kal
 This is **v0.2: the prologue**, playable from start to finish in Beryl's home town, Stillbrook.
 
 - Wake up at home; Mum and Dad leave for their shift at the Mirrormere Dam
-- Visit Jasper's dad (Fighting gym trainer) and Jasper's mum at the Pokémon Pension, with the family Pokémon tagging along
+- Visit Jasper and his parents next door, with the family Pokémon tagging along
 - Prof. Spruce is having tea with Grandma: pick Mossfawn, Newtide or Cindaroo
 - First battle against Jasper, then Spruce's task: fill the Pokédex and follow the Lethys from source to sea
 - That evening, Lethys rises from the river by the ferry dock
@@ -59,7 +59,7 @@ tests/                  vitest tests
 
 ### Story
 
-`src/story/story.ts` holds the events. Each scene runs when you enter a map or talk to someone, and sets a flag when it is done (`woke`, `parentsLeft`, `metJasperDad`, `metJasperMom`, `gotStarter`, `taskGiven`, `prologueDone`).
+`src/story/story.ts` holds the events. Each scene runs when you enter a map or talk to someone, and sets a flag when it is done (`woke`, `parentsLeft`, `metJasper`, `gotStarter`, `taskGiven`, `prologueDone`).
 
 ### Adding a Pokémon
 

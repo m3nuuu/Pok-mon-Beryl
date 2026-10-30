@@ -48,7 +48,7 @@ describe.each(all.map((m) => [m.id, m] as const))('%s map', (_, map) => {
     const seen = new Set<string>();
     for (const [x, y] of starts) for (const k of reachable(map, x, y)) seen.add(k);
     for (const w of map.warps) expect(seen.has(`${w.x},${w.y}`), `warp ${w.x},${w.y}`).toBe(true);
-    // Pokémon in the pension pens are looked at over the fence instead.
+    // Pokémon behind fences are looked at over the fence instead.
     for (const n of map.npcs.filter((n) => !n.look.startsWith('mon-'))) {
       expect(isSolidTile(tileAt(map, n.x, n.y)), n.id).toBe(false);
       expect(STEPS.some(([dx, dy]) => seen.has(`${n.x + dx},${n.y + dy}`)), n.id).toBe(true);
