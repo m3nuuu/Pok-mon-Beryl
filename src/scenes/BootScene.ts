@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { generateArt } from '../art/procedural';
+import { applyCustomGraphics } from '../custom/apply';
 import { SPECIES_LIST } from '../data/species';
 
 export class BootScene extends Phaser.Scene {
@@ -12,8 +13,9 @@ export class BootScene extends Phaser.Scene {
     for (const s of SPECIES_LIST) this.load.image(`mon-${s.id}`, `sprites/${s.sprite}`);
   }
 
-  create() {
+  async create() {
     generateArt(this);
+    await applyCustomGraphics(this);
     this.scene.start('title');
   }
 }

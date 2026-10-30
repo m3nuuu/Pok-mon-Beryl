@@ -20,7 +20,7 @@ export class TitleScene extends Phaser.Scene {
 
     label(this, SCREEN_W / 2, 36, 'POKéMON', { size: 32, color: '#f8f8f8', shadow: '#183048' }).setOrigin(0.5, 0);
     label(this, SCREEN_W / 2, 84, 'BERYL', { size: 64, color: '#7fe0c8', shadow: '#1c5a58' }).setOrigin(0.5, 0);
-    label(this, SCREEN_W / 2, 160, 'Prototype v0.1', { size: 16, color: '#b8d8e8', shadow: '#183048' }).setOrigin(0.5, 0);
+    label(this, SCREEN_W / 2, 160, 'Prototype v0.2', { size: 16, color: '#b8d8e8', shadow: '#183048' }).setOrigin(0.5, 0);
     label(this, SCREEN_W / 2, SCREEN_H - 34, 'Free fan game. Pokémon © Nintendo/Game Freak.', {
       size: 12, color: '#90b0c0', shadow: '',
     }).setOrigin(0.5, 0);
@@ -34,12 +34,14 @@ export class TitleScene extends Phaser.Scene {
   private async run(press: Phaser.GameObjects.Text) {
     await until(this, () => justPressed('a') || justPressed('start'));
     press.destroy();
-    let start = true;
-    if (hasSave()) {
-      const i = await choose(this, ['CONTINUE', 'NEW GAME'], { x: SCREEN_W / 2 - 150, y: SCREEN_H - 150, w: 300 });
-      start = i === 1;
+    const items = [...(hasSave() ? ['CONTINUE'] : []), 'NEW GAME', 'GRAPHICS'];
+    const pick = items[await choose(this, items, { x: SCREEN_W / 2 - 150, y: SCREEN_H - 60 - items.length * 48, w: 300 })];
+    if (pick === 'GRAPHICS') {
+      location.hash = 'graphics';
+      location.reload();
+      return;
     }
-    if (start || !load()) game.state = newGame();
+    if (pick === 'NEW GAME' || !load()) game.state = newGame();
     this.cameras.main.fadeOut(300);
     this.time.delayedCall(320, () => this.scene.start('world'));
   }

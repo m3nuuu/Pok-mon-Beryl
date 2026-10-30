@@ -61,6 +61,10 @@ tests/                  vitest tests
 
 `src/story/story.ts` holds the events. Each scene runs when you enter a map or talk to someone, and sets a flag when it is done (`woke`, `parentsLeft`, `metJasper`, `gotStarter`, `taskGiven`, `prologueDone`).
 
+### Custom graphics
+
+Pick **GRAPHICS** on the title screen (or open the game with `#graphics` at the end of the address). Add your own sprite sheets, choose a tile, building, battle background or character on the left, and click the matching part of the sheet. Everything is stored in that browser only (IndexedDB) and replaces the built-in art the next time the game starts. **Export** and **Import** move a setup to another device. The code is in `src/custom/`.
+
 ### Adding a Pokémon
 
 1. Put a 64×64 PNG front sprite in `public/sprites/`.

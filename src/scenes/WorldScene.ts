@@ -183,6 +183,7 @@ export class WorldScene extends Phaser.Scene implements ScriptApi {
     }
     if (c === 'b') return tileAt(m, x, y - 1) === 'b' ? 'i-bedbot' : 'i-bedtop';
     if (c === 'T') {
+      if (this.textures.exists('i-table')) return 'i-table';
       const t = (dx: number, dy: number) => tileAt(m, x + dx, y + dy) === 'T';
       return tableTexture(this, t(0, -1), t(1, 0), t(0, 1), t(-1, 0));
     }

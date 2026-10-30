@@ -1,5 +1,6 @@
 import '@fontsource/press-start-2p';
 import Phaser from 'phaser';
+import { mountPicker } from './custom/picker';
 import { endFrame, initInput } from './input';
 import { BattleScene } from './scenes/BattleScene';
 import { BootScene } from './scenes/BootScene';
@@ -26,4 +27,5 @@ async function start() {
   (window as unknown as { game: Phaser.Game }).game = game;
 }
 
-void start();
+if (location.hash === '#graphics') void mountPicker();
+else void start();
