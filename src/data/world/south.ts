@@ -190,6 +190,7 @@ const route1: MapDef = {
     { side: 'south', from: 8, to: 9, map: 'lanterncross', offset: 4 },
   ],
   npcs: [
+    { id: 'runaway1', name: 'RUNAWAY POKéMON', x: 14, y: 10, facing: 'left', look: 'mon-lochlet', when: all(has('pensionQuest'), before('runaway1')) },
     trainer('r1a', 5, 10, 'right', 'youngster', {
       name: 'YOUNGSTER FINN', team: [{ species: 'pipwing', lv: 0 }],
       intro: ["Hey! You're from STILLBROOK, right? Let's battle!"], defeat: ['Aww, I wanted to win my first battle...'],

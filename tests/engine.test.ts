@@ -84,7 +84,7 @@ describe('battle math', () => {
   it('levels up and learns moves', () => {
     const p = createPokemon('mossfawn', 8);
     const ups = gainExp(p, expForLevel(9) - p.exp);
-    expect(ups).toEqual([{ level: 9, learned: ['rockthrow'] }]);
+    expect(ups).toEqual([{ level: 9, learned: ['rockthrow'], pending: [] }]);
     expect(p.moves.map((m) => m.id)).toContain('rockthrow');
   });
 
