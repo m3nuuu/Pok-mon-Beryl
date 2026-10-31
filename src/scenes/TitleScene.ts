@@ -20,7 +20,7 @@ export class TitleScene extends Phaser.Scene {
 
     label(this, SCREEN_W / 2, 36, 'POKéMON', { size: 32, color: '#f8f8f8', shadow: '#183048' }).setOrigin(0.5, 0);
     label(this, SCREEN_W / 2, 84, 'BERYL', { size: 64, color: '#7fe0c8', shadow: '#1c5a58' }).setOrigin(0.5, 0);
-    label(this, SCREEN_W / 2, 160, 'Prototype v0.2', { size: 16, color: '#b8d8e8', shadow: '#183048' }).setOrigin(0.5, 0);
+    label(this, SCREEN_W / 2, 160, 'Version 1.0', { size: 16, color: '#b8d8e8', shadow: '#183048' }).setOrigin(0.5, 0);
     label(this, SCREEN_W / 2, SCREEN_H - 34, 'Free fan game. Pokémon © Nintendo/Game Freak.', {
       size: 12, color: '#90b0c0', shadow: '',
     }).setOrigin(0.5, 0);

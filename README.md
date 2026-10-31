@@ -2,14 +2,19 @@
 
 A free, non-commercial, Gen-3-style Pokémon fan game set in the region of **Kaldria**, along the river **Lethys**.
 
-This is **v0.2: the prologue**, playable from start to finish in Beryl's home town, Stillbrook.
+This is **v1.0: the full game**, from waking up in Stillbrook to the Hall of Fame.
 
-- Wake up at home; Mum and Dad leave for their shift at the Mirrormere Dam
-- Visit Jasper and his parents next door, with the family Pokémon tagging along
-- Prof. Spruce is having tea with Grandma: pick Mossfawn, Newtide or Cindaroo
-- First battle against Jasper, then Spruce's task: fill the Pokédex and follow the Lethys from source to sea
-- That evening, Lethys rises from the river by the ferry dock
-- Afterwards: wild Pipwing in the tall grass, the fisherman's Murkfin, healing with Grandma, saving
+- The prologue in Stillbrook: Jasper, Prof. Spruce, your first partner and Lethys at the river
+- 8 gyms in any order (except Torvald's in Stillbrook), with leaders that scale to your badge count
+- The main story: the Stillbrook blackout and the power plant, the Flowkeeper protest at Weirhaven,
+  an egg from the family Pokémon, the rising reservoir and Vesper's bomb, and the truth on the dam crest
+- Three endings: break the dam, keep it sealed, or (with 3 of 4 clues) open the old soul gate
+- Victory Road, the Elite Four, Champion Solenne, the Hall of Fame and credits; Lethys afterwards
+- Side quests: the Pension runaways (EXP Share), Ingrid's pump station, Grandma's letters, the shrine mural,
+  the hidden tunnel, the Emberdeep fossils, fishing rods, and Greta's ferry between river towns
+- Bag, party, summary, Pokédex, trainer card, Marts, PC boxes, FLY, status conditions, evolution and move learning
+
+The canon (map, levels, events, endings) is in `docs/GAME_PLAN.md`.
 
 ## Controls
 
@@ -43,11 +48,11 @@ npm run build    # production build into dist/
 ```
 src/
   art/procedural.ts     placeholder tiles, buildings and characters drawn in code
-  battle/engine.ts      battle math (pure, tested)
-  data/                 species, moves, type chart, maps (town and interiors)
-  story/                story scripts (prologue), driven by flags in the save
+  battle/engine.ts      battle math (pure, tested); battle/teams.ts builds trainer teams
+  data/                 species, moves, items, type chart; data/world/ holds every map, gym and the League
+  story/                story scripts, driven by flags in the save (story.ts hooks, acts.ts, side.ts)
   scenes/               Boot, Title, World, UI (dialogs), Battle
-  ui/widgets.ts         dialog box, menus, async helpers
+  ui/                   dialog box and menus (widgets.ts), full-screen menus (screens.ts)
 public/sprites/         Pokémon sprites (by Manuel)
 public/battle/          battle backgrounds (by Leob0505, see CREDITS.md)
 tests/                  vitest tests
@@ -55,11 +60,11 @@ tests/                  vitest tests
 
 ### Editing the map
 
-`src/data/maps.ts` holds every map as ASCII rows (`T` tree, `,` tall grass, `~` river, `:` path, …), plus its doors (warps), NPCs and sign texts. NPCs can be tied to story flags with `when`. Change a character and reload; `npm test` checks that doors and NPCs stay reachable.
+`src/data/world/*.ts` holds every map as ASCII rows (helpers in `src/data/mapkit.ts`) (`T` tree, `,` tall grass, `~` river, `:` path, …), plus its doors (warps), NPCs and sign texts. NPCs can be tied to story flags with `when`. Change a character and reload; `npm test` checks that doors and NPCs stay reachable.
 
 ### Story
 
-`src/story/story.ts` holds the events. Each scene runs when you enter a map or talk to someone, and sets a flag when it is done (`woke`, `parentsLeft`, `metJasper`, `gotStarter`, `taskGiven`, `prologueDone`).
+`src/story/story.ts` holds the hooks (entering a map, talking, inspecting, after a trainer) and the prologue; `acts.ts` has the main events and endings, `side.ts` the side quests. Each scene sets a flag when it is done, so a save picks up at the right point. `tests/story.test.ts` plays the whole plot through a mock and checks every flag.
 
 ### Custom graphics
 
@@ -68,14 +73,16 @@ Pick **GRAPHICS** on the title screen (or open the game with `#graphics` at the 
 ### Adding a Pokémon
 
 1. Put a 64×64 PNG front sprite in `public/sprites/`.
-2. Add an entry in `src/data/species.ts` (types, base stats, learnset, sprite file name).
+2. Add an entry in `src/data/species.ts` (types, base stats, learnset, sprite file name) and a Pokédex text in `DEX_ENTRIES`.
+3. Put it in wild encounter tables (`encounters` on a map) or trainer teams. Species without a sprite get a placeholder.
 
 ## Placeholders and known limits
 
 - Overworld tiles and characters are simple placeholder pixel art drawn in code, to be replaced by real tilesets (see `CREDITS.md`).
 - Your own Pokémon are shown flipped on the player side, since there are no back sprites yet.
-- The family Pokémon is an original placeholder until its design is ready.
-- No catching, bag, party switching, abilities, status conditions or music yet.
+- The family Pokémon and the egg species (Shellet) are placeholders until their designs are ready.
+- The species list is a placeholder too: gyms use type-fitting moves on the existing species until the full fakemon list arrives.
+- No abilities, held-item battle effects (other than EXP Share), double battles or music yet.
 
 ## Deployment
 

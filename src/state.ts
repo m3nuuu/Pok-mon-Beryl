@@ -1,4 +1,6 @@
-import type { Pokemon } from './battle/engine';
+import { calcStats, movesKnownAt, type Pokemon } from './battle/engine';
+import { MOVES } from './data/moves';
+import { SPECIES } from './data/species';
 import type { MapId } from './data/mapkit';
 
 export type Facing = 'down' | 'up' | 'left' | 'right';
@@ -70,11 +72,22 @@ export function load(): boolean {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return false;
     game.state = { ...newGame(), ...(JSON.parse(raw) as GameState) };
+    const s = game.state;
+    s.party = s.party.filter((p) => SPECIES[p.species]);
+    s.box = s.box.filter((p) => SPECIES[p.species]);
+    for (const p of [...s.party, ...s.box]) repair(p);
     for (const p of [...game.state.party, ...game.state.box]) register(p.species, true);
     return true;
   } catch {
     return false;
   }
+}
+
+/** Fixes Pokémon from old or hand-edited saves: unknown moves, no moves, HP above the maximum. */
+function repair(p: Pokemon): void {
+  p.moves = (p.moves ?? []).filter((m) => MOVES[m.id]);
+  if (!p.moves.length) p.moves = movesKnownAt(p.species, p.level).map((id) => ({ id, pp: MOVES[id].pp }));
+  p.hp = Math.max(0, Math.min(p.hp ?? 0, calcStats(p).hp));
 }
 
 /** Marks a species as caught (and seen) in the Pokédex. */

@@ -188,7 +188,7 @@ export class WorldScene extends Phaser.Scene implements ScriptApi {
 
     this.player = new Walker(this, 'beryl', x, y, facing);
     this.grassOverlay = add(this.add.image(0, 0, this.themed('t-tall-top')).setOrigin(0).setVisible(false));
-    this.tint = add(this.add.rectangle(0, 0, 4000, 4000, 0x000000, 0).setOrigin(0).setScrollFactor(0).setDepth(90000));
+    this.tint = add(this.add.rectangle(-T * 20, -T * 20, (this.map.rows[0].length + 40) * T, (this.map.rows.length + 40) * T, 0x000000, 0).setOrigin(0).setDepth(90000));
     this.refresh();
     this.updateGrassOverlay();
 

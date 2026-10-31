@@ -703,7 +703,7 @@ export class BattleScene extends Phaser.Scene {
   /** The party screen in battle. `forced` after a faint: no cancelling. Returns true if a switch happened. */
   private async switchMenu(forced: boolean): Promise<boolean> {
     const party = game.state.party;
-    let start = Math.max(0, party.indexOf(this.player.mon));
+    let start = forced ? Math.max(0, party.findIndex((p) => p.hp > 0)) : Math.max(0, party.indexOf(this.player.mon));
     for (;;) {
       const r = await partyAction(this, () => ['SHIFT', 'SUMMARY'], {
         active: party.indexOf(this.player.mon), start,

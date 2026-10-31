@@ -108,7 +108,7 @@ export async function afterTrainer(api: ScriptApi, id: string): Promise<void> {
 /** A colour wash over a map, for the blackout and the rising reservoir. */
 export function mapTint(mapId: string): { color: number; alpha: number } | null {
   const f = flags();
-  if (mapId === 'stillbrook' && f.ev2 && !f.plantDone) return { color: 0x101830, alpha: 0.4 };
+  if (mapId === 'stillbrook' && f.ev2 && !f.plantDone) return { color: 0x0c1428, alpha: 0.5 };
   if (mapId === 'weirhaven' && f.ev7 && !f.ev7done) return { color: 0x203058, alpha: 0.3 };
   if (mapId === 'damcrest' && f.ev8 && !f.decided) return { color: 0x402818, alpha: 0.2 };
   return null;
