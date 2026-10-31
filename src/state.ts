@@ -1,5 +1,5 @@
 import type { Pokemon } from './battle/engine';
-import type { MapId } from './data/maps';
+import type { MapId } from './data/mapkit';
 
 export type Facing = 'down' | 'up' | 'left' | 'right';
 
@@ -12,6 +12,22 @@ export interface GameState {
   badges: number;
   flags: Record<string, boolean>;
   player: { map: MapId; x: number; y: number; facing: Facing };
+  money: number;
+  /** Pokédex: species seen and caught. */
+  seen: Record<string, boolean>;
+  caught: Record<string, boolean>;
+  playMs: number;
+  /** Town of the last Pokémon Center used; whiting out returns there. */
+  lastCenter?: string;
+  /** EXP. Share slider: percent of battle EXP that goes to the holder. */
+  expShare: number;
+  /** An egg being carried: hatches after this many steps. */
+  egg?: { species: string; steps: number };
+  repel: number;
+  /** Trainer ID shown on the trainer card. */
+  trainerId: number;
+  /** Which ending was chosen at the dam: 'break', 'seal' or 'gate'. */
+  ending?: 'break' | 'seal' | 'gate';
 }
 
 const SAVE_KEY = 'pokemon-beryl-save-v2';
@@ -23,7 +39,11 @@ export const START_POSITION = { map: 'home' as MapId, x: 2, y: 3, facing: 'down'
 export const HOME_DOOR = { map: 'stillbrook' as MapId, x: 4, y: 8, facing: 'down' as Facing };
 
 export function newGame(): GameState {
-  return { party: [], box: [], bag: {}, badges: 0, flags: {}, player: { ...START_POSITION } };
+  return {
+    party: [], box: [], bag: {}, badges: 0, flags: {}, player: { ...START_POSITION },
+    money: 3000, seen: {}, caught: {}, playMs: 0, expShare: 50, repel: 0,
+    trainerId: Math.floor(Math.random() * 65536),
+  };
 }
 
 /** The single live game state shared by all scenes. */
@@ -50,10 +70,28 @@ export function load(): boolean {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return false;
     game.state = { ...newGame(), ...(JSON.parse(raw) as GameState) };
+    for (const p of [...game.state.party, ...game.state.box]) register(p.species, true);
     return true;
   } catch {
     return false;
   }
+}
+
+/** Marks a species as caught (and seen) in the Pokédex. */
+export function register(species: string, caught: boolean): void {
+  game.state.seen[species] = true;
+  if (caught) game.state.caught[species] = true;
+}
+
+/** Adds a Pokémon to the party, or to the PC box when the party is full. Returns 'party' or 'box'. */
+export function receive(p: Pokemon): 'party' | 'box' {
+  register(p.species, true);
+  if (game.state.party.length < 6) {
+    game.state.party.push(p);
+    return 'party';
+  }
+  game.state.box.push(p);
+  return 'box';
 }
 
 export function addItem(id: string, n = 1): void {
